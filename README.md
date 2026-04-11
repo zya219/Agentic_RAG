@@ -1,88 +1,109 @@
-# HiPRAG: Hierarchical Process Rewards for Efficient Agentic Retrieval Augmented Generation
+# Agentic_RAG
 
-**HiPRAG** (Hierarchical Process Rewards for Efficient Agentic Retrieval Augmented Generation) is a reinforcement learning method designed for training **reasoning-and-searching interleaved LLMs** with improved efficiency and reduced oversearching as well as undersearching behavior. Built upon the foundation of [Search-R1](https://github.com/PeterGriffinJin/Search-R1), HiPRAG introduces hierarchical process reward mechanisms to optimize search strategies and enhance reasoning capabilities.
+This repository is based on [HiPRAG](https://github.com/qualidea1217/HiPRAG) and is being adapted for my undergraduate thesis project on Agentic RAG strategy optimization.
 
-HiPRAG extends the ideas of **Search-R1** by incorporating intelligent search planning and provides a open-source RL training pipeline for developing more efficient search agent systems.
+The current goal is to build a decision-aware Agentic RAG baseline, and then further explore token-level action decomposition for retrieval-related actions.
 
-Paper: [HiPRAG](https://arxiv.org/abs/2510.07794); Code: [GitHub](https://github.com/qualidea1217/HiPRAG); Models: [Hugging Face](https://huggingface.co/collections/qualidea1217/hiprag-68e68c99b8db4d575986c555).
+## Upstream Project
 
-## Key Features
-- **Multi-level reasoning**: Implements hierarchical planning to break down complex queries into manageable sub-problems
-- **Search optimization**: Reduces oversearching and undersearching through intelligent search planning and validation
-- **Step-by-step reasoning**: Maintains structured reasoning with `<think>`, `<step>`, `<reasoning>`, `<search>`, `<context>`, and `<conclusion>` tags
+This project is derived from HiPRAG, which is licensed under Apache License 2.0.
 
-## Installation
+Original paper:
+- HiPRAG: Hierarchical Process Rewards for Efficient Agentic Retrieval Augmented Generation
 
-We use the exact same environment as [Search-R1](https://github.com/PeterGriffinJin/Search-R1), you can refer to their repository about setting up trainer and retriever environment.
+Original resources:
+- Code: https://github.com/qualidea1217/HiPRAG
+- Paper: https://arxiv.org/abs/2510.07794
 
-## Quick Start
+## Current Project Status
 
-Train a reasoning + search LLM with HiPRAG's hierarchical process rewards on NQ + HotpotQA dataset with e5 as the retriever and wikipedia as the corpus.
+Compared with the original HiPRAG codebase, the current repository has already introduced several modifications for decision-aware Agentic RAG experimentation:
 
-(1) Download the indexing and corpus.
-```bash
-save_path=/the/path/to/save
-python scripts/download.py --save_path $save_path
-cat $save_path/part_* > $save_path/e5_Flat.index
-gzip -d $save_path/wiki-18.jsonl.gz
-```
+### 1. Pre-decision module
+A `decide_retrieval(question)` function is added before inference to decide whether a question should enter the retrieval path or the direct path.
 
-(2) Download the NQ + HotpotQA dataset from [Huggingface](https://huggingface.co/datasets/qualidea1217/HiPRAG-Dataset) .
+### 2. Dual-path inference
+The inference pipeline is split into:
+- retrieval path
+- direct path
 
-(3) Launch a local retrieval server.
+The retrieval path preserves the original search-augmented generation behavior, while the direct path answers without triggering retrieval.
+
+### 3. Direct prompt
+A dedicated `DIRECT_PROMPT` is added for direct answering without `<search>`.
+
+### 4. Structured output logging
+The inference output is expanded from plain text to structured fields including:
+
+- `decision`
+- `decision_type`
+- `result`
+- `has_search`
+- `search_queries`
+- `search_count`
+- `final_answer`
+
+### 5. Cleaner response parsing
+Additional helper functions are added to:
+- strip assistant output from chat template prefixes
+- extract search queries
+- extract final answers from `<answer>...</answer>`
+
+## Minimal Run
+
+### 1. Start retrieval server
+
 ```bash
 conda activate retriever
 bash retrieval_launch.sh
 ```
 
-(4) Fill in the openai api key at the top of the verl/utils/reward_score/qa_em_format.py
+### 2. Run inference
 
-(5) Run RL training (PPO) with HiPRAG's reward system.
-```bash
-conda activate searchr1
-bash scripts/nq_hotpotqa/v0.3/train_ppo_format.sh
-```
-
-## Inference
-
-#### You can play with the trained HiPRAG model with your own question.
-
-(1) Launch a local retrieval server.
-```bash
-conda activate retriever
-bash retrieval_launch.sh
-```
-
-(2) Use the function inside inference.py (such as inference_hf_single() for inference single question using huggingface backend), you may need to adjust the parameters in it to fit your environment. For inference on multiple samples, you can also look at the test_template.json for how to organize the data.
 ```bash
 python inference.py
 ```
 
-## Evaluation
+## Default Input / Output
 
-(1) Launch a local retrieval server.
+Default input:
+- `results/test_template.jsonl`
+
+Default output:
+- `results/hf_test_output.jsonl`
+
+## Notes
+
+This repository is an experimental development version for Agentic RAG research, rather than an exact mirror of the original HiPRAG repository.
+
+The current codebase is primarily used for:
+- running and understanding the baseline
+- adding explicit retrieval decision logic
+- preparing for later token-level action decomposition experiments
+
+## Recommended Environment
+
+Current commonly used environment:
+
 ```bash
 conda activate retriever
-bash retrieval_launch.sh
-```
-
-(2) Use the function inside analysis.py (such as over_under_search_eval_hf_single() for over and under-search analysis on trajectory of single question using huggingface backend and openai api), you may need to adjust the parameters in it to fit your environment such as openai api key.
-```bash
-python analysis.py
 ```
 
 ## Acknowledgments
 
-HiPRAG builds upon the excellent work of several open-source projects:
+This project builds upon the excellent work of several open-source projects:
 
-- **Search-R1**: The foundational framework for reasoning-and-searching interleaved LLMs
-- **DeepSeek-R1**: Inspiration for reasoning capabilities
-- **veRL**: The underlying RL training infrastructure
-- **RAGEN**: Components for retrieval-augmented generation
+- HiPRAG
+- Search-R1
+- veRL
+- DeepSeek-R1
+- RAGEN
 
-We sincerely appreciate the efforts of these teams for their contributions to open-source research and development.
+Sincere thanks to the original authors and contributors.
 
-## Citations
+## Citation
+
+If you use the original HiPRAG framework, please cite the original paper:
 
 ```bibtex
 @misc{wu2025hipraghierarchicalprocessrewards,
@@ -92,14 +113,10 @@ We sincerely appreciate the efforts of these teams for their contributions to op
       eprint={2510.07794},
       archivePrefix={arXiv},
       primaryClass={cs.CL},
-      url={https://arxiv.org/abs/2510.07794}, 
+      url={https://arxiv.org/abs/2510.07794}
 }
 ```
 
 ## License
 
-This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENSE) file for details.
-
-## Contact
-
-For questions and discussions about HiPRAG, please open an issue on GitHub or contact the authors.
+This project follows the Apache License 2.0 inherited from the upstream HiPRAG project. See `LICENSE` for details.
