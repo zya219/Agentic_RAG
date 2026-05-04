@@ -41,6 +41,7 @@ from verl.utils.seqlen_balancing import get_seqlen_balanced_partitions, log_seql
 
 import re
 from search_r1.llm_agent.generation import LLMGenerationManager, GenerationConfig
+from search_r1.agentic_rag_reward import build_token_level_scores
 
 WorkerType = Type[Worker]
 
@@ -784,8 +785,18 @@ class RayPPOTrainer(object):
                             reward_tensor = self.rm_wg.compute_rm_score(batch)
                             batch = batch.union(reward_tensor)
 
-                        # we combine with rule-based rm
-                        reward_tensor = self.reward_fn(batch, actor_rollout_wg=self.actor_rollout_wg)
+                        # Build token-level scores for PPO from the thesis reward adapter.
+                        # Fallback to the existing reward_fn if adapter scoring fails.
+                        reward_tensor = None
+                        try:
+                            reward_tensor = build_token_level_scores(batch, tokenizer=self.tokenizer)
+                            reward_tensor = reward_tensor.to(batch.batch['responses'].device)
+                        except Exception as e:
+                            print(f'[WARNING] token-level reward adapter failed, fallback to reward_fn: {e}')
+
+                        if reward_tensor is None:
+                            reward_tensor = self.reward_fn(batch, actor_rollout_wg=self.actor_rollout_wg)
+
                         batch.batch['token_level_scores'] = reward_tensor
 
                         # compute rewards. apply_kl_penalty if available

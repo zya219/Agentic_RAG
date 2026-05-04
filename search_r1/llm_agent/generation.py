@@ -1,6 +1,5 @@
 import torch
 import re
-from collections import defaultdict
 import os
 from typing import List, Dict, Any, Tuple
 from dataclasses import dataclass
@@ -123,7 +122,7 @@ class LLMGenerationManager:
                 response: torch.Tensor, 
                 info: torch.Tensor = None,
                 pad_to_left: bool = True
-            ) -> torch.Tensor:
+            ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """Concatenate tensors and handle padding. Additionally, create a mask (info_mask) to cover the information block if it exists."""
         pad_id = self.tokenizer.pad_token_id
         tensors = [prompt, response]
@@ -140,14 +139,61 @@ class LLMGenerationManager:
         padded_tensor = concatenated.gather(1, sorted_indices)
         padded_tensor_with_info = concatenated_with_info.gather(1, sorted_indices)
 
-        return padded_tensor, padded_tensor_with_info
+        return padded_tensor, padded_tensor_with_info, sorted_indices
+
+    def _build_action_metadata(
+        self,
+        responses: torch.Tensor,
+        responses_str: List[str],
+        step_id: int,
+    ) -> Dict[str, torch.Tensor]:
+        """Build token-level action metadata for generated response tokens."""
+        pad_id = self.tokenizer.pad_token_id
+        action_mask = torch.zeros_like(responses, dtype=torch.long)
+        search_mask = torch.zeros_like(responses, dtype=torch.long)
+        answer_mask = torch.zeros_like(responses, dtype=torch.long)
+        step_ids = torch.zeros_like(responses, dtype=torch.long)
+
+        for i, response_str in enumerate(responses_str):
+            valid_len = int((responses[i] != pad_id).sum().item())
+            if valid_len > 0:
+                step_ids[i, :valid_len] = step_id
+
+            match = re.search(r'<(search|answer)>.*?</\1>', response_str, re.DOTALL)
+            if not match:
+                continue
+
+            char_start, char_end = match.span()
+            prefix = response_str[:char_start]
+            action_span = response_str[char_start:char_end]
+
+            start_tok = len(self.tokenizer(prefix, add_special_tokens=False)['input_ids'])
+            span_len = len(self.tokenizer(action_span, add_special_tokens=False)['input_ids'])
+            end_tok = min(start_tok + span_len, valid_len)
+
+            if end_tok <= start_tok:
+                continue
+
+            action_mask[i, start_tok:end_tok] = 1
+            if match.group(1) == 'search':
+                search_mask[i, start_tok:end_tok] = 1
+            else:
+                answer_mask[i, start_tok:end_tok] = 1
+
+        return {
+            'action_mask': action_mask,
+            'search_mask': search_mask,
+            'answer_mask': answer_mask,
+            'step_ids': step_ids,
+        }
 
     def _update_right_side(self, right_side: Dict, 
                           cur_responses: torch.Tensor,
+                          cur_metadata: Dict[str, torch.Tensor],
                           next_obs_ids: torch.Tensor = None) -> Dict:
         """Update right side state."""
         if next_obs_ids != None:
-            responses, responses_with_info_mask = self._info_masked_concatenate_with_padding(
+            responses, responses_with_info_mask, sorted_indices = self._info_masked_concatenate_with_padding(
                     right_side['responses'],
                     right_side['responses_with_info_mask'],
                     cur_responses,
@@ -155,16 +201,31 @@ class LLMGenerationManager:
                     pad_to_left=False
                 )
         else:
-            responses, responses_with_info_mask = self._info_masked_concatenate_with_padding(
+            responses, responses_with_info_mask, sorted_indices = self._info_masked_concatenate_with_padding(
                     right_side['responses'],
                     right_side['responses_with_info_mask'],
                     cur_responses,
                     pad_to_left=False
                 )
+        appended_metadata = {}
+        for name in ['action_mask', 'search_mask', 'answer_mask', 'step_ids']:
+            tensors = [right_side[name], cur_metadata[name]]
+            if next_obs_ids is not None:
+                tensors.append(torch.zeros_like(next_obs_ids, dtype=right_side[name].dtype, device=right_side[name].device))
+            concatenated = torch.cat(tensors, dim=1)
+            appended_metadata[name] = concatenated.gather(1, sorted_indices)
+
         effective_len = self.tensor_fn.create_attention_mask(responses).sum(dim=1).max()
         max_len = min(self.config.max_prompt_length, effective_len)
-        
-        return {'responses': responses[:, :max_len], 'responses_with_info_mask': responses_with_info_mask[:, :max_len]}
+
+        return {
+            'responses': responses[:, :max_len],
+            'responses_with_info_mask': responses_with_info_mask[:, :max_len],
+            'action_mask': appended_metadata['action_mask'][:, :max_len],
+            'search_mask': appended_metadata['search_mask'][:, :max_len],
+            'answer_mask': appended_metadata['answer_mask'][:, :max_len],
+            'step_ids': appended_metadata['step_ids'][:, :max_len],
+        }
 
     def _generate_with_gpu_padding(self, active_batch: DataProto) -> DataProto:
         """
@@ -221,7 +282,14 @@ class LLMGenerationManager:
         """Run main LLM generation loop."""
         
         original_left_side = {'input_ids': initial_input_ids[:, -self.config.max_start_length:]}
-        original_right_side = {'responses': initial_input_ids[:, []], 'responses_with_info_mask': initial_input_ids[:, []]}
+        original_right_side = {
+            'responses': initial_input_ids[:, []],
+            'responses_with_info_mask': initial_input_ids[:, []],
+            'action_mask': torch.zeros_like(initial_input_ids[:, []], dtype=torch.long),
+            'search_mask': torch.zeros_like(initial_input_ids[:, []], dtype=torch.long),
+            'answer_mask': torch.zeros_like(initial_input_ids[:, []], dtype=torch.long),
+            'step_ids': torch.zeros_like(initial_input_ids[:, []], dtype=torch.long),
+        }
         
         active_mask = torch.ones(gen_batch.batch['input_ids'].shape[0], dtype=torch.bool)
         turns_stats = torch.ones(gen_batch.batch['input_ids'].shape[0], dtype=torch.int)
@@ -248,6 +316,7 @@ class LLMGenerationManager:
             meta_info = gen_output.meta_info            
             responses_ids, responses_str = self._postprocess_responses(gen_output.batch['responses'])
             responses_ids, responses_str = self.tensor_fn._example_level_pad(responses_ids, responses_str, active_mask)
+            cur_metadata = self._build_action_metadata(responses_ids, responses_str, step_id=step + 1)
 
             # Execute in environment and process observations
             next_obs, dones, valid_action, is_search = self.execute_predictions(
@@ -272,6 +341,7 @@ class LLMGenerationManager:
             original_right_side = self._update_right_side(
                 original_right_side,
                 responses_ids,
+                cur_metadata,
                 next_obs_ids
             )
             
@@ -291,6 +361,7 @@ class LLMGenerationManager:
             meta_info = gen_output.meta_info            
             responses_ids, responses_str = self._postprocess_responses(gen_output.batch['responses'])
             responses_ids, responses_str = self.tensor_fn._example_level_pad(responses_ids, responses_str, active_mask)
+            cur_metadata = self._build_action_metadata(responses_ids, responses_str, step_id=self.config.max_turns + 1)
 
             # # Execute in environment and process observations
             _, dones, valid_action, is_search = self.execute_predictions(
@@ -307,6 +378,7 @@ class LLMGenerationManager:
             original_right_side = self._update_right_side(
                 original_right_side,
                 responses_ids,
+                cur_metadata,
             )
         
         meta_info['turns_stats'] = turns_stats.tolist()
@@ -340,6 +412,11 @@ class LLMGenerationManager:
             self.tensor_fn.create_attention_mask(left_side['input_ids']),
             self.tensor_fn.create_attention_mask(final_output['responses_with_info_mask'])
         ], dim=1)
+        zero_prompt_mask = torch.zeros_like(left_side['input_ids'], dtype=torch.long)
+        final_output['action_mask'] = torch.cat([zero_prompt_mask, right_side['action_mask']], dim=1)
+        final_output['search_mask'] = torch.cat([zero_prompt_mask, right_side['search_mask']], dim=1)
+        final_output['answer_mask'] = torch.cat([zero_prompt_mask, right_side['answer_mask']], dim=1)
+        final_output['step_ids'] = torch.cat([zero_prompt_mask, right_side['step_ids']], dim=1)
         
         final_output['position_ids'] = self.tensor_fn.create_position_ids(
             final_output['attention_mask']
