@@ -1,5 +1,5 @@
+import argparse
 import httpx
-from pandas.core.indexes.base import str_t
 import requests
 from openai import OpenAI, AsyncOpenAI
 from tqdm import tqdm
@@ -16,6 +16,8 @@ from prompt import AGENT_PROMPT_V2_SHORT, DIRECT_PROMPT
 from utils import extract_str_between, load_jsonl, write_jsonl
 
 import re
+
+RETRIEVER_URL = "http://127.0.0.1:8000/retrieve"
 
 def decide_retrieval(question: str) -> bool:
     """
@@ -108,7 +110,7 @@ def strip_to_assistant_answer(text: str) -> str:
         return text.split(marker, 1)[1].strip()
     return text.strip()
 
-def search(query):
+def search(query, retriever_url: Optional[str] = None):
     """Perform search using the search endpoint."""
     try:
         payload = {
@@ -116,7 +118,8 @@ def search(query):
             "topk": 3,
             "return_scores": True
         }
-        response = requests.post("http://127.0.0.1:8000/retrieve", json=payload)
+        url = retriever_url or RETRIEVER_URL
+        response = requests.post(url, json=payload)
         results = response.json()['result']
         
         # Format search results
@@ -148,7 +151,7 @@ async def close_httpx_client_async() -> None:
         _HTTPX_CLIENT_ASYNC = None
 
 
-async def search_async(query: str) -> str:
+async def search_async(query: str, retriever_url: Optional[str] = None) -> str:
     """Perform search asynchronously using `httpx.AsyncClient`.
 
     If a `client` is provided, it will be reused. Otherwise a module-level
@@ -161,7 +164,8 @@ async def search_async(query: str) -> str:
             "return_scores": True,
         }
         search_client = await get_httpx_client_async()
-        response = await search_client.post("http://127.0.0.1:8000/retrieve", json=payload)
+        url = retriever_url or RETRIEVER_URL
+        response = await search_client.post(url, json=payload)
 
         response.raise_for_status()
         results = response.json()['result']
@@ -178,7 +182,7 @@ async def search_async(query: str) -> str:
         return f"Search error: {str(e)}"
 
 
-def inference_hf_single(question: str, model, tokenizer, prompt: str = AGENT_PROMPT_V2_SHORT) -> str:
+def inference_hf_single(question: str, model, tokenizer, prompt: str = AGENT_PROMPT_V2_SHORT, retriever_url: Optional[str] = None) -> str:
     """
     Performs inference using an agentic RAG LLM with the specified XML format.
     
@@ -250,7 +254,7 @@ def inference_hf_single(question: str, model, tokenizer, prompt: str = AGENT_PRO
         search_query = extract_search_query(output_text)
         
         if search_query:  # Continue the generation with search results in context
-            search_results = search(search_query)
+            search_results = search(search_query, retriever_url=retriever_url)
             full_response += f"\n    <context>{search_results}</context>\n    <conclusion>"
         else:
             full_response += "\n    <conclusion>"
@@ -314,7 +318,8 @@ def inference_hf(
     question: list[str] | str,
     model_id: str,
     tokenizer_id: Optional[str] = None,
-    prompt: str = AGENT_PROMPT_V2_SHORT
+    prompt: str = AGENT_PROMPT_V2_SHORT,
+    retriever_url: Optional[str] = None
 ) -> list[dict]:
     """
     Performs inference using Hugging Face Transformers with an explicit
@@ -344,7 +349,8 @@ def inference_hf(
                 q,
                 model,
                 tokenizer,
-                prompt
+                prompt,
+                retriever_url=retriever_url
             )
         else:
             result = inference_hf_single_direct(
@@ -356,18 +362,35 @@ def inference_hf(
 
         search_queries = extract_search_queries(result)
 
-        output.append({
+        has_search = len(search_queries) > 0
+        final_answer = extract_final_answer(result)
+        row = {
             "question": q,
             "decision": decision,
             "decision_type": "retrieve" if decision else "direct",
             "result": result,
-            "has_search": len(search_queries) > 0,
+            "has_search": has_search,
             "search_queries": search_queries,
             "search_count": len(search_queries),
-            "final_answer": extract_final_answer(result),
-        })
+            "final_answer": final_answer,
+        }
+        row.update(build_diagnostic_fields(decision, has_search, final_answer))
+        output.append(row)
 
     return output
+
+
+
+def build_diagnostic_fields(decision: bool, has_search: bool, final_answer: Optional[str]) -> dict:
+    final_answer_norm = final_answer.strip() if isinstance(final_answer, str) else ""
+    return {
+        "expected_search": decision,
+        "actual_search": has_search,
+        "search_mismatch": decision and not has_search,
+        "search_overuse": (not decision) and has_search,
+        "decision_search_consistent": decision == has_search,
+        "answer_missing": not final_answer_norm,
+    }
 
 def inference_vllm_single(
     question: str,
@@ -375,6 +398,7 @@ def inference_vllm_single(
     model_id: str,
     prompt=AGENT_PROMPT_V2_SHORT,
     tokenizer: Optional[transformers.PreTrainedTokenizerBase] = None,
+    retriever_url: Optional[str] = None,
 ):
     """
     Performs inference using an agentic RAG LLM with the specified XML format using vllm server with OpenAI API client.
@@ -435,7 +459,7 @@ def inference_vllm_single(
         search_query = extract_search_query(output_text)
 
         if search_query:  # Continue the generation with search results in context
-            search_results = search(search_query)
+            search_results = search(search_query, retriever_url=retriever_url)
             full_response += f"\n    <context>{search_results}</context>\n    <conclusion>"
         else:
             full_response += "\n    <conclusion>"
@@ -446,7 +470,7 @@ def inference_vllm_single(
     return full_response
 
 
-def inference_vllm(question: list[str] | str, api_key: str, base_url: str, model_id: str, tokenizer_id: Optional[str] = None, prompt=AGENT_PROMPT_V2_SHORT):
+def inference_vllm(question: list[str] | str, api_key: str, base_url: str, model_id: str, tokenizer_id: Optional[str] = None, prompt=AGENT_PROMPT_V2_SHORT, retriever_url: Optional[str] = None):
     """
     Performs inference using an agentic RAG LLM with the specified XML format using vllm server with OpenAI API client.
     
@@ -465,12 +489,12 @@ def inference_vllm(question: list[str] | str, api_key: str, base_url: str, model
         question = [question]
     output = []
     for q in tqdm(question):
-        output.append(inference_vllm_single(q, vllm_client, model_id, prompt, tokenizer))
+        output.append(inference_vllm_single(q, vllm_client, model_id, prompt, tokenizer, retriever_url=retriever_url))
     return output
     
 
 # Async variants using AsyncOpenAI and search_async
-async def inference_vllm_single_async(question: str, vllm_client: AsyncOpenAI, model_id: str, prompt=AGENT_PROMPT_V2_SHORT, tokenizer: Optional[transformers.PreTrainedTokenizerBase] = None) -> str:
+async def inference_vllm_single_async(question: str, vllm_client: AsyncOpenAI, model_id: str, prompt=AGENT_PROMPT_V2_SHORT, tokenizer: Optional[transformers.PreTrainedTokenizerBase] = None, retriever_url: Optional[str] = None) -> str:
     """
     Async version of `inference_vllm_single` using AsyncOpenAI and `search_async`.
     Mirrors the exact logic of the sync version.
@@ -523,7 +547,7 @@ async def inference_vllm_single_async(question: str, vllm_client: AsyncOpenAI, m
         search_query = extract_search_query(output_text)
 
         if search_query:  # Continue the generation with search results in context
-            search_results = await search_async(search_query)
+            search_results = await search_async(search_query, retriever_url=retriever_url)
             full_response += f"\n    <context>{search_results}</context>\n    <conclusion>"
         else:
             full_response += "\n    <conclusion>"
@@ -534,7 +558,7 @@ async def inference_vllm_single_async(question: str, vllm_client: AsyncOpenAI, m
     return full_response
 
 
-async def inference_vllm_async(question: list[str] | str, api_key: str, base_url: str, model_id: str, tokenizer_id: Optional[str] = None, prompt=AGENT_PROMPT_V2_SHORT, max_concurrency: int = 64) -> list[str]:
+async def inference_vllm_async(question: list[str] | str, api_key: str, base_url: str, model_id: str, tokenizer_id: Optional[str] = None, prompt=AGENT_PROMPT_V2_SHORT, max_concurrency: int = 64, retriever_url: Optional[str] = None) -> list[str]:
     """
     Async version of `inference_vllm` using AsyncOpenAI and `inference_vllm_single_async`.
     Mirrors the exact logic of the sync version.
@@ -549,7 +573,7 @@ async def inference_vllm_async(question: list[str] | str, api_key: str, base_url
 
     async def run_one(q: str) -> str:
         async with semaphore:
-            return await inference_vllm_single_async(q, vllm_client, model_id, prompt, tokenizer)
+            return await inference_vllm_single_async(q, vllm_client, model_id, prompt, tokenizer, retriever_url=retriever_url)
 
     tasks = [run_one(q) for q in question]
     results = await tqdm_async.gather(*tasks)
@@ -558,57 +582,38 @@ async def inference_vllm_async(question: list[str] | str, api_key: str, base_url
     return list(results)
 
 
-# def inference():
-#     BASE_URL = "http://localhost:8001/v1"
-#     MODEL_ID = "/home/pxw240002/Search-R1/verl_checkpoints/nq_hotpotqa_train-search-r1-grpo-qwen2.5-3b-it-em-structureformat-step-wiser/actor/global_step_200/"
-#     API_KEY = "EMPTY"
-#     MAX_CONCURRENCY = 64
-
-#     data_list = load_jsonl("results/test_template.jsonl")
-#     questions = [data["question"] for data in data_list]
-
-#     # results = inference_vllm(questions, API_KEY, BASE_URL, MODEL_ID, MODEL_ID, AGENT_PROMPT_V2_SHORT)
-#     results = asyncio.run(
-#         inference_vllm_async(
-#             question=questions,
-#             api_key=API_KEY,
-#             base_url=BASE_URL,
-#             model_id=MODEL_ID,
-#             tokenizer_id=MODEL_ID,
-#             prompt=AGENT_PROMPT_V2_SHORT,
-#             max_concurrency=MAX_CONCURRENCY,
-#         )
-#     )
-
-#     for data, result in zip(data_list, results):
-#         data["result"] = result
-#     write_jsonl(data_list, "results/qwen2.5-3b-it-grpo-wiser-step-200.jsonl")
-#     print(f"Wrote {len(data_list)} rows with result to: results/qwen2.5-3b-it-grpo-wiser-step-200.jsonl")
-
 def inference():
-    MODEL_ID = "Qwen/Qwen2.5-3B-Instruct"
+    parser = argparse.ArgumentParser(description="Run decision-aware HF inference for Agentic RAG.")
+    parser.add_argument("--input_jsonl", default="results/test_template.jsonl")
+    parser.add_argument("--output_jsonl", default="results/hf_test_output.jsonl")
+    parser.add_argument("--model_id", default="Qwen/Qwen2.5-3B-Instruct")
+    parser.add_argument("--tokenizer_id", default=None, help="Defaults to --model_id when omitted.")
+    parser.add_argument("--max_samples", type=int, default=None)
+    parser.add_argument("--retriever_url", default="http://127.0.0.1:8000/retrieve")
+    args = parser.parse_args()
 
-    data_list = load_jsonl("results/test_template.jsonl")
+    global RETRIEVER_URL
+    RETRIEVER_URL = args.retriever_url
+
+    data_list = load_jsonl(args.input_jsonl)
+    if args.max_samples is not None:
+        data_list = data_list[:args.max_samples]
     questions = [data["question"] for data in data_list]
 
+    tokenizer_id = args.tokenizer_id if args.tokenizer_id else args.model_id
     results = inference_hf(
         question=questions,
-        model_id=MODEL_ID,
-        tokenizer_id=MODEL_ID,
+        model_id=args.model_id,
+        tokenizer_id=tokenizer_id,
         prompt=AGENT_PROMPT_V2_SHORT,
+        retriever_url=args.retriever_url,
     )
 
     for data, result in zip(data_list, results):
-        data["decision"] = result["decision"]
-        data["decision_type"] = result["decision_type"]
-        data["result"] = result["result"]
-        data["has_search"] = result["has_search"]
-        data["search_queries"] = result["search_queries"]
-        data["search_count"] = result["search_count"]
-        data["final_answer"] = result["final_answer"]
+        data.update(result)
 
-    write_jsonl(data_list, "results/hf_test_output.jsonl")
-    print(f"Wrote {len(data_list)} rows with result to: results/hf_test_output.jsonl")
+    write_jsonl(data_list, args.output_jsonl)
+    print(f"Wrote {len(data_list)} rows with result to: {args.output_jsonl}")
 
 # Example usage
 if __name__ == "__main__":
