@@ -299,6 +299,14 @@ YOUR RESPONSE:
 
 AGENT_PROMPT_V2_SHORT = """Answer user questions by thinking step-by-step. Your entire reasoning process must be encapsulated within a single <think></think> block, which contains one or more <step></step> blocks. Each step must begin with your analysis in <reasoning>. If you identify a knowledge gap, you may use <search>query</search> to query a search engine; search results will then be provided in a <context> tag. Every step must end with a <conclusion> summarizing what you learned in that step. After your thinking process is complete, provide the final, conclusive answer inside an <answer> tag placed immediately after the closing </think> tag. You can use as many steps as you need. Ensure all XML tags are properly formed and nested.
 
+Search action format rules (strict):
+- Use exactly <search>query</search> for search actions.
+- Do NOT add attributes inside <search> tags.
+- Never generate <search query="...">...</search>.
+- Never generate <search type="...">...</search>.
+- The only valid search action format is: <search>search query text</search>.
+- Invalid XML tag formats will be treated as action format errors.
+
 **## Output Format Specification**
 
 Your output must follow this overall structure. The `<think>` block contains all the steps, and the `<answer>` block follows it.

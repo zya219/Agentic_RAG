@@ -101,6 +101,15 @@ def extract_search_queries(text: str) -> list[str]:
     matches = extract_str_between(text, "<search>", "</search>")
     return [m.strip() for m in matches if m.strip()]
 
+
+def extract_invalid_search_queries(text: str) -> list[str]:
+    """
+    Detect <search ...>...</search> attempts with attributes.
+    These are invalid action formats and should not be counted as valid search.
+    """
+    pattern = r"<search\s+[^>]*>(.*?)</search>"
+    return [m.strip() for m in re.findall(pattern, text, flags=re.DOTALL) if m.strip()]
+
 def strip_to_assistant_answer(text: str) -> str:
     """
     Keep only the assistant response after the chat template prefix.
@@ -361,8 +370,15 @@ def inference_hf(
             )
 
         search_queries = extract_search_queries(result)
-
+        invalid_search_queries = extract_invalid_search_queries(result)
         has_search = len(search_queries) > 0
+        invalid_search_format = len(invalid_search_queries) > 0
+        if has_search:
+            search_action_status = "valid_search"
+        elif invalid_search_format:
+            search_action_status = "invalid_search_format"
+        else:
+            search_action_status = "no_search"
         final_answer = extract_final_answer(result)
         row = {
             "question": q,
@@ -372,6 +388,10 @@ def inference_hf(
             "has_search": has_search,
             "search_queries": search_queries,
             "search_count": len(search_queries),
+            "invalid_search_format": invalid_search_format,
+            "invalid_search_queries": invalid_search_queries,
+            "invalid_search_count": len(invalid_search_queries),
+            "search_action_status": search_action_status,
             "final_answer": final_answer,
         }
         row.update(build_diagnostic_fields(decision, has_search, final_answer))
