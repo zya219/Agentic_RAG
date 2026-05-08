@@ -37,6 +37,9 @@ python analyze_inference_results.py \
 ## Notes
 - The current retrieval server uses CPU FAISS.
 - `e5_Flat.index` is ~61GB, while a single RTX 4090 has 24GB VRAM.
+- `<search>...</search>` is the only valid search action format.
+- `<search query="...">...</search>` (or any `<search ...>...</search>` with attributes) is detected as `invalid_search_format`, not counted as a valid search action.
+- This distinction is kept for future reward design and token-level credit assignment.
 
 ## Analyze manual eval results
 ```bash
@@ -45,4 +48,3 @@ python analyze_manual_eval.py \
   --summary_json results/manual_eval_summary_10case.json \
   --problem_jsonl results/manual_eval_problem_cases_10case.jsonl
 ```
-
