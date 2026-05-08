@@ -37,3 +37,12 @@ python analyze_inference_results.py \
 ## Notes
 - The current retrieval server uses CPU FAISS.
 - `e5_Flat.index` is ~61GB, while a single RTX 4090 has 24GB VRAM.
+
+## Analyze manual eval results
+```bash
+python analyze_manual_eval.py \
+  --input_jsonl results/manual_eval_10case.jsonl \
+  --summary_json results/manual_eval_summary_10case.json \
+  --problem_jsonl results/manual_eval_problem_cases_10case.jsonl
+```
+
