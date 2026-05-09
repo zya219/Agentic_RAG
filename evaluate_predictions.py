@@ -151,39 +151,60 @@ def main() -> None:
             "trajectory_segments": traj,
         })
 
-    def summarize(rows: list[dict[str, Any]]) -> dict[str, Any]:
+    def summarize(rows: list[dict[str, Any]], include_groups: bool = False) -> dict[str, Any]:
         total = len(rows)
         if total == 0:
             return {"total": 0}
-        mean = lambda k: sum(r["reward_components"][k] for r in rows) / total
+
+        def mean_component(k: str) -> float:
+            return sum(r["reward_components"][k] for r in rows) / total
+
         summary = {
             "total": total,
             "answer_em": sum(r["answer_em"] for r in rows) / total,
             "answer_f1": sum(r["answer_f1"] for r in rows) / total,
-            "avg_final_reward": mean("final_reward"),
-            "avg_answer_reward": mean("answer_reward"),
-            "avg_search_decision_reward": mean("search_decision_reward"),
-            "avg_format_reward": mean("format_reward"),
-            "avg_efficiency_penalty": mean("efficiency_penalty"),
+            "avg_final_reward": mean_component("final_reward"),
+            "avg_answer_reward": mean_component("answer_reward"),
+            "avg_search_decision_reward": mean_component("search_decision_reward"),
+            "avg_format_reward": mean_component("format_reward"),
+            "avg_efficiency_penalty": mean_component("efficiency_penalty"),
             "answer_missing_count": sum(1 for r in rows if r["reward_components"]["answer_missing_penalty"] < 0),
             "search_mismatch_count": sum(1 for r in rows if r["reward_components"]["search_decision_reward"] < 0),
             "invalid_search_format_count": sum(1 for r in rows if r["reward_components"]["format_reward"] < 0),
-            "avg_search_count": sum(int(r.get("search_count", len(r["trajectory_segments"]["valid_search_contents"]))) for r in rows) / total,
+            "avg_search_count": sum(
+                int(r.get("search_count", len(r["trajectory_segments"]["valid_search_contents"])))
+                for r in rows
+            ) / total,
             "reward_component_means": {
-                k: mean(k)
-                for k in ["answer_em", "answer_f1", "answer_reward", "search_decision_reward", "format_reward", "efficiency_penalty", "answer_missing_penalty", "final_reward"]
+                k: mean_component(k)
+                for k in [
+                    "answer_em",
+                    "answer_f1",
+                    "answer_reward",
+                    "search_decision_reward",
+                    "format_reward",
+                    "efficiency_penalty",
+                    "answer_missing_penalty",
+                    "final_reward",
+                ]
             },
         }
-        for group_key in ["data_source", "split_name"]:
-            bucket = defaultdict(list)
-            for r in rows:
-                if group_key in r:
-                    bucket[str(r[group_key])].append(r)
-            if bucket:
-                summary[f"grouped_by_{group_key}"] = {k: summarize(v) for k, v in bucket.items()}
+
+        if include_groups:
+            for group_key in ["data_source", "split_name"]:
+                bucket = defaultdict(list)
+                for r in rows:
+                    if group_key in r:
+                        bucket[str(r[group_key])].append(r)
+                if bucket:
+                    summary[f"grouped_by_{group_key}"] = {
+                        k: summarize(v, include_groups=False)
+                        for k, v in bucket.items()
+                    }
+
         return summary
 
-    summary = summarize(out_rows)
+    summary = summarize(out_rows, include_groups=True)
     os.makedirs(os.path.dirname(args.output_jsonl) or ".", exist_ok=True)
     with open(args.output_jsonl, "w", encoding="utf-8") as f:
         for r in out_rows:
