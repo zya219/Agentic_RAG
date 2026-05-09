@@ -72,7 +72,6 @@ python analyze_manual_eval.py \
 - The current retrieval server uses CPU FAISS.
 - `e5_Flat.index` is ~61GB, while a single RTX 4090 has 24GB VRAM.
 - `<search>...</search>` is the only valid search action format.
-- HiPRAG-Dataset commonly uses `golden_answers` as the gold answer field in parquet; `build_benchmark_subset.py` auto-detects and exports it as `answer`.
 - `<search query="...">...</search>` (or any `<search ...>...</search>` with attributes) is detected as `invalid_search_format`, not counted as a valid search action.
 - This distinction is kept for future reward design and token-level credit assignment.
 - **Do not tune reward weights on `test.parquet`; use `test.parquet` only for final evaluation.**

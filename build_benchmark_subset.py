@@ -11,12 +11,12 @@ from __future__ import annotations
 import argparse
 import json
 import os
-import math
 from typing import Any
 
+import pandas as pd
 
 QUESTION_CANDIDATES = ["question", "query", "prompt", "input"]
-ANSWER_CANDIDATES = ["answer", "answers", "gold_answer", "ground_truth", "target", "golden_answers"]
+ANSWER_CANDIDATES = ["answer", "answers", "gold_answer", "ground_truth", "target"]
 
 
 def detect_field(columns: list[str], candidates: list[str]) -> str:
@@ -37,56 +37,16 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def to_jsonable(value: Any) -> Any:
-    try:
-        import numpy as np
-        np_generic = (np.generic,)
-        np_ndarray = (np.ndarray,)
-    except Exception:
-        np_generic = tuple()
-        np_ndarray = tuple()
-
-    """Convert pandas/numpy values into JSON-serializable Python objects."""
-    if value is None:
-        return None
-
-    if isinstance(value, float) and math.isnan(value):
-        return None
-
-    if isinstance(value, (str, int, float, bool)):
+def normalize_answer_value(value: Any) -> Any:
+    if isinstance(value, list):
         return value
-
-    if np_generic and isinstance(value, np_generic):
-        return to_jsonable(value.item())
-
-    if np_ndarray and isinstance(value, np_ndarray):
-        return [to_jsonable(v) for v in value.tolist()]
-
-    if isinstance(value, (list, tuple)):
-        return [to_jsonable(v) for v in value]
-
-    if isinstance(value, dict):
-        return {str(k): to_jsonable(v) for k, v in value.items()}
-
-    if hasattr(value, "tolist"):
-        converted = value.tolist()
-        if converted is not value:
-            return to_jsonable(converted)
-
-    try:
-        # Handles pandas NA/NaT without ambiguous list/dict/array checks.
-        if value != value:
-            return None
-    except Exception:
-        pass
-
-    return str(value)
+    if isinstance(value, tuple):
+        return list(value)
+    return value
 
 
 def main() -> None:
     args = parse_args()
-    import pandas as pd
-
     df = pd.read_parquet(args.input_parquet)
 
     question_field = detect_field(df.columns.tolist(), QUESTION_CANDIDATES)
@@ -102,11 +62,11 @@ def main() -> None:
     for i, (_, r) in enumerate(sampled.iterrows()):
         row_id = r[id_field] if id_field is not None else i
         rows.append({
-            "id": to_jsonable(row_id),
-            "question": to_jsonable(r[question_field]),
-            "answer": to_jsonable(r[answer_field]),
-            "data_source": to_jsonable(r[data_source_field]) if data_source_field is not None else "benchmark_subset",
-            "split_name": to_jsonable(args.split_name),
+            "id": row_id,
+            "question": str(r[question_field]),
+            "answer": normalize_answer_value(r[answer_field]),
+            "data_source": r[data_source_field] if data_source_field is not None else "benchmark_subset",
+            "split_name": args.split_name,
         })
 
     with open(args.output_jsonl, "w", encoding="utf-8") as f:
