@@ -75,3 +75,23 @@ python analyze_manual_eval.py \
 - `<search query="...">...</search>` (or any `<search ...>...</search>` with attributes) is detected as `invalid_search_format`, not counted as a valid search action.
 - This distinction is kept for future reward design and token-level credit assignment.
 - **Do not tune reward weights on `test.parquet`; use `test.parquet` only for final evaluation.**
+
+## Baseline / ablation smoke runs
+```bash
+python baseline_experiments.py --help
+
+python baseline_experiments.py \
+  --input_jsonl results/reward_calibration_500.jsonl \
+  --output_jsonl results/direct_reward_calibration_5_output.jsonl \
+  --mode direct \
+  --model_id Qwen/Qwen2.5-3B-Instruct \
+  --max_samples 5
+
+python baseline_experiments.py \
+  --input_jsonl results/reward_calibration_500.jsonl \
+  --output_jsonl results/always_retrieve_reward_calibration_5_output.jsonl \
+  --mode always_retrieve \
+  --model_id Qwen/Qwen2.5-3B-Instruct \
+  --retriever_url http://127.0.0.1:8000/retrieve \
+  --max_samples 5
+```
