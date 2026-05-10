@@ -10,7 +10,7 @@ from __future__ import annotations
 import re
 from typing import Any, Dict
 
-from search_r1.query_token_decomposition import allocate_reward_to_tokens, build_query_token_masks
+from search_r1.query_token_decomposition import allocate_reward_to_tokens, build_query_token_masks, build_response_token_masks
 
 import torch
 
@@ -135,7 +135,34 @@ def _extract_ground_truth(non_tensor_batch: Dict[str, Any]) -> Any:
     return ""
 
 
-def build_token_level_scores(batch, tokenizer=None, reward_decomposition_mode: str = "none") -> torch.Tensor:
+
+
+def build_token_level_scores_with_debug(
+    batch,
+    tokenizer=None,
+    reward_decomposition_mode: str = "none",
+    format_reward_value: float = 0.0,
+    format_penalty_value: float = -1.0,
+):
+    token_scores = build_token_level_scores(
+        batch=batch,
+        tokenizer=tokenizer,
+        reward_decomposition_mode=reward_decomposition_mode,
+        format_reward_value=format_reward_value,
+        format_penalty_value=format_penalty_value,
+        return_debug=False,
+    )
+    _, debug_info = build_token_level_scores(
+        batch=batch,
+        tokenizer=tokenizer,
+        reward_decomposition_mode=reward_decomposition_mode,
+        format_reward_value=format_reward_value,
+        format_penalty_value=format_penalty_value,
+        return_debug=True,
+    )
+    return token_scores, debug_info
+
+def build_token_level_scores(batch, tokenizer=None, reward_decomposition_mode: str = "none", format_reward_value: float = 0.0, format_penalty_value: float = -1.0, return_debug: bool = False):
     """Build PPO-compatible token-level scores from a rollout batch.
 
     Args:
@@ -151,7 +178,7 @@ def build_token_level_scores(batch, tokenizer=None, reward_decomposition_mode: s
     if tokenizer is None:
         raise ValueError("tokenizer is required for build_token_level_scores")
 
-    allowed_modes = {"none", "coarse_action", "query_token_uniform"}
+    allowed_modes = {"none", "coarse_action", "query_token_uniform", "strict_query_token"}
     if reward_decomposition_mode not in allowed_modes:
         raise ValueError(
             f"Unsupported reward_decomposition_mode={reward_decomposition_mode!r}; "
@@ -161,6 +188,7 @@ def build_token_level_scores(batch, tokenizer=None, reward_decomposition_mode: s
     responses = batch.batch["responses"]
     batch_size, response_len = responses.shape
     token_scores = torch.zeros((batch_size, response_len), dtype=torch.float32, device=responses.device)
+    debug_rows = []
 
     has_action_mask = "action_mask" in batch.batch
     has_answer_mask = "answer_mask" in batch.batch
@@ -194,21 +222,11 @@ def build_token_level_scores(batch, tokenizer=None, reward_decomposition_mode: s
             answer_mask=answer_mask,
             search_mask=search_mask,
         )
-        if reward_decomposition_mode in {"coarse_action", "query_token_uniform"} and valid_response_len > 0:
-            masks = build_query_token_masks(response_text, tokenizer)
-            selected = []
-            if reward_decomposition_mode == "coarse_action":
-                selected = [idx for idx, v in enumerate(masks["action_mask"]) if v > 0 and idx < valid_response_len]
-            elif reward_decomposition_mode == "query_token_uniform":
-                selected = [idx for idx, v in enumerate(masks["query_token_mask"]) if v > 0 and idx < valid_response_len]
-                if not selected:
-                    selected = [idx for idx, v in enumerate(masks["action_mask"]) if v > 0 and idx < valid_response_len]
-                if not selected:
-                    selected = [valid_response_len - 1]
-
-            search_only_scores, _ = allocate_reward_to_tokens(valid_response_len, selected, search_reward)
+        warnings = []
+        if reward_decomposition_mode in {"coarse_action", "query_token_uniform", "strict_query_token"} and valid_response_len > 0:
+            masks = build_response_token_masks(response_text, tokenizer)
             token_scores_i = token_scores_i.clone()
-            # remove default search reward assignment then overwrite with decomposition scores
+            # clear default search allocation
             default_search_mask = torch.nonzero((search_mask > 0) if search_mask is not None else torch.zeros(valid_response_len), as_tuple=False).flatten()
             if default_search_mask.numel() > 0:
                 token_scores_i[default_search_mask] -= search_reward / default_search_mask.numel()
@@ -216,9 +234,56 @@ def build_token_level_scores(batch, tokenizer=None, reward_decomposition_mode: s
                 default_action_mask = torch.nonzero((action_mask > 0) if action_mask is not None else torch.zeros(valid_response_len), as_tuple=False).flatten()
                 if default_action_mask.numel() > 0:
                     token_scores_i[default_action_mask] -= search_reward / default_action_mask.numel()
-                else:
+                elif valid_response_len > 0:
                     token_scores_i[valid_response_len - 1] -= search_reward
-            token_scores_i[:valid_response_len] += torch.tensor(search_only_scores, dtype=token_scores_i.dtype, device=token_scores_i.device)
+
+            search_selected = []
+            if reward_decomposition_mode == "coarse_action":
+                search_selected = [idx for idx, v in enumerate(masks["action_mask"]) if v > 0 and idx < valid_response_len]
+            else:
+                search_selected = [idx for idx, v in enumerate(masks["search_query_mask"]) if v > 0 and idx < valid_response_len]
+                if reward_decomposition_mode == "query_token_uniform" and not search_selected:
+                    search_selected = [idx for idx, v in enumerate(masks["action_mask"]) if v > 0 and idx < valid_response_len] or [valid_response_len - 1]
+
+            strict_search_reward = search_reward
+            if reward_decomposition_mode == "strict_query_token" and masks["invalid_search_count"] > 0:
+                strict_search_reward = 0.0
+
+            search_scores, _ = allocate_reward_to_tokens(valid_response_len, search_selected, strict_search_reward)
+            token_scores_i[:valid_response_len] += torch.tensor(search_scores, dtype=token_scores_i.dtype, device=token_scores_i.device)
+
+            if reward_decomposition_mode == "strict_query_token":
+                # remove default answer assignment and re-allocate by answer mask
+                answer_idx_default = torch.nonzero((answer_mask > 0) if answer_mask is not None else torch.zeros(valid_response_len), as_tuple=False).flatten()
+                if answer_idx_default.numel() > 0:
+                    token_scores_i[answer_idx_default] -= answer_reward / answer_idx_default.numel()
+                elif valid_response_len > 0:
+                    token_scores_i[valid_response_len - 1] -= answer_reward
+                ans_selected = [idx for idx, v in enumerate(masks["answer_content_mask"]) if v > 0 and idx < valid_response_len]
+                ans_scores, _ = allocate_reward_to_tokens(valid_response_len, ans_selected, answer_reward)
+                token_scores_i[:valid_response_len] += torch.tensor(ans_scores, dtype=token_scores_i.dtype, device=token_scores_i.device)
+
+                format_selected = [idx for idx, v in enumerate(masks["format_mask"]) if v > 0 and idx < valid_response_len]
+                format_reward = format_reward_value if masks["invalid_search_count"] == 0 else format_penalty_value
+                if not format_selected and masks["invalid_search_count"] > 0 and valid_response_len > 0:
+                    format_selected = [valid_response_len - 1]
+                fmt_scores, _ = allocate_reward_to_tokens(valid_response_len, format_selected, format_reward)
+                token_scores_i[:valid_response_len] += torch.tensor(fmt_scores, dtype=token_scores_i.dtype, device=token_scores_i.device)
+                if not search_selected:
+                    warnings.append("no_query_tokens_for_strict_search_reward")
+
+            debug_rows.append({
+                "query_token_count": int(sum(masks["search_query_mask"][:valid_response_len])),
+                "answer_content_token_count": int(sum(masks["answer_content_mask"][:valid_response_len])),
+                "format_token_count": int(sum(masks["format_mask"][:valid_response_len])),
+                "invalid_search_count": int(masks["invalid_search_count"]),
+                "search_reward_sum": float(sum(search_scores)),
+                "answer_reward_sum": float(answer_reward),
+                "format_reward_sum": float((format_reward_value if masks["invalid_search_count"] == 0 else format_penalty_value) if reward_decomposition_mode=="strict_query_token" else 0.0),
+                "total_token_score_sum": float(token_scores_i[:valid_response_len].sum().item()),
+                "warnings": list(masks.get("warnings", [])) + warnings,
+            })
+
         token_scores[i, :valid_response_len] = token_scores_i.to(token_scores.device)
 
-    return token_scores
+    return (token_scores, debug_rows) if return_debug else token_scores
