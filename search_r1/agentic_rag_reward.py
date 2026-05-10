@@ -10,6 +10,8 @@ from __future__ import annotations
 import re
 from typing import Any, Dict
 
+from search_r1.query_token_decomposition import allocate_reward_to_tokens, build_query_token_masks
+
 import torch
 
 from reward import cover_exact_match
@@ -133,7 +135,7 @@ def _extract_ground_truth(non_tensor_batch: Dict[str, Any]) -> Any:
     return ""
 
 
-def build_token_level_scores(batch, tokenizer=None) -> torch.Tensor:
+def build_token_level_scores(batch, tokenizer=None, reward_decomposition_mode: str = "none") -> torch.Tensor:
     """Build PPO-compatible token-level scores from a rollout batch.
 
     Args:
@@ -185,6 +187,31 @@ def build_token_level_scores(batch, tokenizer=None) -> torch.Tensor:
             answer_mask=answer_mask,
             search_mask=search_mask,
         )
+        if reward_decomposition_mode in {"coarse_action", "query_token_uniform"} and valid_response_len > 0:
+            masks = build_query_token_masks(response_text, tokenizer)
+            selected = []
+            if reward_decomposition_mode == "coarse_action":
+                selected = [idx for idx, v in enumerate(masks["action_mask"]) if v > 0 and idx < valid_response_len]
+            elif reward_decomposition_mode == "query_token_uniform":
+                selected = [idx for idx, v in enumerate(masks["query_token_mask"]) if v > 0 and idx < valid_response_len]
+                if not selected:
+                    selected = [idx for idx, v in enumerate(masks["action_mask"]) if v > 0 and idx < valid_response_len]
+                if not selected:
+                    selected = [valid_response_len - 1]
+
+            search_only_scores, _ = allocate_reward_to_tokens(valid_response_len, selected, search_reward)
+            token_scores_i = token_scores_i.clone()
+            # remove default search reward assignment then overwrite with decomposition scores
+            default_search_mask = torch.nonzero((search_mask > 0) if search_mask is not None else torch.zeros(valid_response_len), as_tuple=False).flatten()
+            if default_search_mask.numel() > 0:
+                token_scores_i[default_search_mask] -= search_reward / default_search_mask.numel()
+            else:
+                default_action_mask = torch.nonzero((action_mask > 0) if action_mask is not None else torch.zeros(valid_response_len), as_tuple=False).flatten()
+                if default_action_mask.numel() > 0:
+                    token_scores_i[default_action_mask] -= search_reward / default_action_mask.numel()
+                else:
+                    token_scores_i[valid_response_len - 1] -= search_reward
+            token_scores_i[:valid_response_len] += torch.tensor(search_only_scores, dtype=token_scores_i.dtype, device=token_scores_i.device)
         token_scores[i, :valid_response_len] = token_scores_i.to(token_scores.device)
 
     return token_scores
