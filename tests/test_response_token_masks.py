@@ -24,11 +24,24 @@ def test_invalid_search():
 def test_strict_no_fallback():
     text='</search>'
     ids=torch.tensor([[ord(c) for c in text]],dtype=torch.long)
-    class B: pass
-    b=B(); b.batch={'responses':ids,'attention_mask':torch.ones_like(ids),'prompts':torch.zeros((1,0),dtype=torch.long)}; b.non_tensor_batch={}; b.meta_info={'tokenizer':MockTokenizer()}
-    def __len__(self): return 1
-    def __getitem__(self,i): return self
-    B.__len__=__len__; B.__getitem__=__getitem__
+    class Item: pass
+    class B:
+        def __init__(self):
+            self.batch={'responses':ids,'attention_mask':torch.ones_like(ids),'prompts':torch.zeros((1,0),dtype=torch.long)}
+            self.non_tensor_batch={}
+            self.meta_info={'tokenizer':MockTokenizer()}
+        def __len__(self):
+            return self.batch['responses'].shape[0]
+        def __getitem__(self,i):
+            item=Item()
+            item.batch={
+                'responses':self.batch['responses'][i],
+                'attention_mask':self.batch['attention_mask'][i],
+                'prompts':torch.zeros((0,),dtype=torch.long),
+            }
+            item.non_tensor_batch={}
+            return item
+    b=B()
     s=build_token_level_scores(b,tokenizer=MockTokenizer(),reward_decomposition_mode='strict_query_token')
     assert float(s.sum().item())<=0.0
 

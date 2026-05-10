@@ -1,8 +1,6 @@
 #!/usr/bin/env python3
-import argparse, json
-from transformers import AutoTokenizer
+import argparse, json, os
 from search_r1.query_token_decomposition import build_response_token_masks
-from search_r1.agentic_rag_reward import compute_answer_correctness_reward
 
 def allocate(n, idxs, r):
     s=[0.0]*n
@@ -20,7 +18,10 @@ def main():
     ap.add_argument('--text_field',default='result');ap.add_argument('--search_reward_value',type=float,default=1.0)
     ap.add_argument('--answer_reward_value',type=float,default=1.0);ap.add_argument('--format_reward_value',type=float,default=0.0)
     ap.add_argument('--format_penalty_value',type=float,default=-1.0);ap.add_argument('--require_search',action='store_true');ap.add_argument('--require_answer',action='store_true')
-    a=ap.parse_args(); tok=AutoTokenizer.from_pretrained(a.model_id)
+    a=ap.parse_args()
+    from transformers import AutoTokenizer
+
+    tok=AutoTokenizer.from_pretrained(a.model_id)
     rows=[]
     with open(a.input_jsonl) as f:
         for ln in f:
@@ -56,8 +57,13 @@ def main():
         md.append(f"## id={item['id']}\n")
         md.append(f"invalid_search_count: {item['invalid_search_count']}\n\n")
         md.append('|index|token|offset|masks|token_reward|\n|---:|---|---|---|---:|\n')
-        for i,t in enumerate(item['tokens']): md.append(f"|{i}|{str(t).replace('|','\\|')}|{item['offsets'][i]}|{','.join(masks[i])}|{rewards[i]:.6f}|\n")
+        for i,t in enumerate(item['tokens']):
+            safe_token = str(t).replace('|', '\\|')
+            mask_text = ','.join(masks[i])
+            md.append(f"|{i}|{safe_token}|{item['offsets'][i]}|{mask_text}|{rewards[i]:.6f}|\n")
         if len(out)>=a.max_samples: break
+    os.makedirs(os.path.dirname(a.output_markdown) or '.', exist_ok=True)
+    os.makedirs(os.path.dirname(a.output_jsonl) or '.', exist_ok=True)
     open(a.output_markdown,'w').write(''.join(md))
     with open(a.output_jsonl,'w') as f:
         for o in out: f.write(json.dumps(o,ensure_ascii=False)+'\n')

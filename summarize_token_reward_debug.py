@@ -1,5 +1,10 @@
 #!/usr/bin/env python3
-import argparse,csv,json,collections
+import argparse,csv,json,collections,os
+
+def ensure_parent(path):
+ parent=os.path.dirname(path)
+ if parent:
+  os.makedirs(parent, exist_ok=True)
 
 def main():
  ap=argparse.ArgumentParser();ap.add_argument('--input_jsonl',required=True);ap.add_argument('--output_markdown',default='results/token_reward_debug_summary.md');ap.add_argument('--output_csv',default='results/token_reward_debug_summary.csv');ap.add_argument('--output_json',default='results/token_reward_debug_summary.json');a=ap.parse_args()
@@ -20,6 +25,7 @@ def main():
  'avg_total_reward_sum':avg([r.get('reward_sums',{}).get('total',0.0) for r in rows]),
  'max_reward_conservation_error':max([abs(r.get('reward_sums',{}).get('conservation_error',0.0)) for r in rows], default=0.0),
  'warning_counts':dict(wc)}
+ ensure_parent(a.output_markdown); ensure_parent(a.output_csv); ensure_parent(a.output_json)
  open(a.output_json,'w').write(json.dumps(s,ensure_ascii=False,indent=2))
  with open(a.output_csv,'w',newline='') as f:
   w=csv.writer(f); w.writerow(['metric','value']); [w.writerow([k,v]) for k,v in s.items() if k!='warning_counts']

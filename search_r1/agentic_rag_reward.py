@@ -144,15 +144,7 @@ def build_token_level_scores_with_debug(
     format_reward_value: float = 0.0,
     format_penalty_value: float = -1.0,
 ):
-    token_scores = build_token_level_scores(
-        batch=batch,
-        tokenizer=tokenizer,
-        reward_decomposition_mode=reward_decomposition_mode,
-        format_reward_value=format_reward_value,
-        format_penalty_value=format_penalty_value,
-        return_debug=False,
-    )
-    _, debug_info = build_token_level_scores(
+    token_scores, debug_info = build_token_level_scores(
         batch=batch,
         tokenizer=tokenizer,
         reward_decomposition_mode=reward_decomposition_mode,
@@ -248,6 +240,9 @@ def build_token_level_scores(batch, tokenizer=None, reward_decomposition_mode: s
             strict_search_reward = search_reward
             if reward_decomposition_mode == "strict_query_token" and masks["invalid_search_count"] > 0:
                 strict_search_reward = 0.0
+            if reward_decomposition_mode == "strict_query_token" and not search_selected:
+                strict_search_reward = 0.0
+                warnings.append("no_query_tokens_for_strict_search_reward")
 
             search_scores, _ = allocate_reward_to_tokens(valid_response_len, search_selected, strict_search_reward)
             token_scores_i[:valid_response_len] += torch.tensor(search_scores, dtype=token_scores_i.dtype, device=token_scores_i.device)
@@ -269,9 +264,6 @@ def build_token_level_scores(batch, tokenizer=None, reward_decomposition_mode: s
                     format_selected = [valid_response_len - 1]
                 fmt_scores, _ = allocate_reward_to_tokens(valid_response_len, format_selected, format_reward)
                 token_scores_i[:valid_response_len] += torch.tensor(fmt_scores, dtype=token_scores_i.dtype, device=token_scores_i.device)
-                if not search_selected:
-                    warnings.append("no_query_tokens_for_strict_search_reward")
-
             debug_rows.append({
                 "query_token_count": int(sum(masks["search_query_mask"][:valid_response_len])),
                 "answer_content_token_count": int(sum(masks["answer_content_mask"][:valid_response_len])),
