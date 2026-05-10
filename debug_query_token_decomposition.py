@@ -2,9 +2,8 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 from typing import Any, Dict, List
-
-from transformers import AutoTokenizer
 
 from search_r1.query_token_decomposition import allocate_reward_to_tokens, build_query_token_masks
 
@@ -23,6 +22,8 @@ def parse_args():
 
 def main():
     args = parse_args()
+    from transformers import AutoTokenizer
+
     tokenizer = AutoTokenizer.from_pretrained(args.model_id)
 
     with open(args.input_jsonl, "r", encoding="utf-8") as f:
@@ -37,21 +38,30 @@ def main():
         masks = build_query_token_masks(text, tokenizer)
         response_len = len(masks["tokens"])
 
+        # Mode semantics:
+        # - none: no-allocation baseline (all zero token scores)
+        # - coarse_action: allocate to the whole <search>...</search> action span
+        # - query_token_uniform: allocate to query tokens only, fallback to coarse action then last token
         warnings = []
-        selected: List[int] = []
-        if args.mode == "coarse_action":
-            selected = [idx for idx, v in enumerate(masks["action_mask"]) if v > 0]
-        elif args.mode == "query_token_uniform":
-            selected = [idx for idx, v in enumerate(masks["query_token_mask"]) if v > 0]
-            if not selected:
-                fallback = [idx for idx, v in enumerate(masks["action_mask"]) if v > 0]
-                if fallback:
-                    selected = fallback
-                    warnings.append("fallback_to_coarse_action")
-                elif response_len > 0:
-                    selected = [response_len - 1]
-                    warnings.append("fallback_to_last_token")
-        scores, warn = allocate_reward_to_tokens(response_len, selected, args.search_reward_value if args.mode != "none" else 0.0)
+        if args.mode == "none":
+            scores = [0.0] * response_len
+            warn = None
+        else:
+            selected: List[int] = []
+            if args.mode == "coarse_action":
+                selected = [idx for idx, v in enumerate(masks["action_mask"]) if v > 0]
+            elif args.mode == "query_token_uniform":
+                selected = [idx for idx, v in enumerate(masks["query_token_mask"]) if v > 0]
+                if not selected:
+                    fallback = [idx for idx, v in enumerate(masks["action_mask"]) if v > 0]
+                    if fallback:
+                        selected = fallback
+                        warnings.append("fallback_to_coarse_action")
+                    elif response_len > 0:
+                        selected = [response_len - 1]
+                        warnings.append("fallback_to_last_token")
+            scores, warn = allocate_reward_to_tokens(response_len, selected, args.search_reward_value)
+
         if warn:
             warnings.append(warn)
 
@@ -76,6 +86,7 @@ def main():
             }
         )
 
+    os.makedirs(os.path.dirname(args.output_jsonl) or ".", exist_ok=True)
     with open(args.output_jsonl, "w", encoding="utf-8") as f:
         for item in outputs:
             f.write(json.dumps(item, ensure_ascii=False) + "\n")
