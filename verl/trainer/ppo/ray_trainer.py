@@ -41,7 +41,7 @@ from verl.utils.seqlen_balancing import get_seqlen_balanced_partitions, log_seql
 
 import re
 from search_r1.llm_agent.generation import LLMGenerationManager, GenerationConfig
-from search_r1.agentic_rag_reward import build_token_level_scores
+from search_r1.agentic_rag_reward import build_token_level_scores, build_token_level_scores_with_debug
 
 WorkerType = Type[Worker]
 
@@ -788,8 +788,28 @@ class RayPPOTrainer(object):
                         # Build token-level scores for PPO from the thesis reward adapter.
                         # Fallback to the existing reward_fn if adapter scoring fails.
                         reward_tensor = None
+                        reward_debug_info = None
+                        reward_mode = self.config.get("reward_decomposition_mode", "none")
+                        format_reward_value = self.config.get("format_reward_value", 0.0)
+                        format_penalty_value = self.config.get("format_penalty_value", -1.0)
+                        reward_debug_enabled = self.config.get("reward_debug", False)
                         try:
-                            reward_tensor = build_token_level_scores(batch, tokenizer=self.tokenizer)
+                            if reward_debug_enabled:
+                                reward_tensor, reward_debug_info = build_token_level_scores_with_debug(
+                                    batch,
+                                    tokenizer=self.tokenizer,
+                                    reward_decomposition_mode=reward_mode,
+                                    format_reward_value=format_reward_value,
+                                    format_penalty_value=format_penalty_value,
+                                )
+                            else:
+                                reward_tensor = build_token_level_scores(
+                                    batch,
+                                    tokenizer=self.tokenizer,
+                                    reward_decomposition_mode=reward_mode,
+                                    format_reward_value=format_reward_value,
+                                    format_penalty_value=format_penalty_value,
+                                )
                             reward_tensor = reward_tensor.to(batch.batch['responses'].device)
                         except Exception as e:
                             print(f'[WARNING] token-level reward adapter failed, fallback to reward_fn: {e}')
@@ -798,6 +818,19 @@ class RayPPOTrainer(object):
                             reward_tensor = self.reward_fn(batch, actor_rollout_wg=self.actor_rollout_wg)
 
                         batch.batch['token_level_scores'] = reward_tensor
+
+                        if reward_debug_enabled and reward_debug_info:
+                            reward_fields = [
+                                'query_token_count', 'answer_content_token_count', 'format_token_count', 'invalid_search_count',
+                                'search_reward_sum', 'answer_reward_sum', 'format_reward_sum', 'total_token_score_sum',
+                            ]
+                            for field in reward_fields:
+                                values = [float(row.get(field, 0.0)) for row in reward_debug_info if isinstance(row, dict)]
+                                if values:
+                                    metrics[f'reward_decomposition/{field}_mean'] = float(np.mean(values))
+
+                            for mode in ["none", "coarse_action", "query_token_uniform", "strict_query_token"]:
+                                metrics[f'reward_decomposition/mode_{mode}'] = 1.0 if reward_mode == mode else 0.0
 
                         # compute rewards. apply_kl_penalty if available
                         if not self.config.actor_rollout_ref.actor.use_kl_loss:
@@ -814,6 +847,18 @@ class RayPPOTrainer(object):
                                                   gamma=self.config.algorithm.gamma,
                                                   lam=self.config.algorithm.lam,
                                                   num_repeat=self.config.actor_rollout_ref.rollout.n)
+
+                        ppo_chain_tensors = {
+                            'token_level_scores': batch.batch['token_level_scores'] if 'token_level_scores' in batch.batch else None,
+                            'token_level_rewards': batch.batch['token_level_rewards'] if 'token_level_rewards' in batch.batch else None,
+                            'advantages': batch.batch['advantages'] if 'advantages' in batch.batch else None,
+                            'returns': batch.batch['returns'] if 'returns' in batch.batch else None,
+                        }
+                        for name, tensor in ppo_chain_tensors.items():
+                            if tensor is not None:
+                                t = tensor.float()
+                                metrics[f'ppo_chain/{name}_mean'] = float(torch.mean(t).detach().item())
+                                metrics[f'ppo_chain/{name}_abs_mean'] = float(torch.mean(torch.abs(t)).detach().item())
 
                     # update critic
                     if self.use_critic:
