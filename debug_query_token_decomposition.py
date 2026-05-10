@@ -17,6 +17,7 @@ def parse_args():
     p.add_argument("--text_field", default="result")
     p.add_argument("--mode", choices=["none", "coarse_action", "query_token_uniform"], default="none")
     p.add_argument("--search_reward_value", type=float, default=1.0)
+    p.add_argument("--require_search", action="store_true", help="Keep only rows containing at least one <search> action.")
     return p.parse_args()
 
 
@@ -29,13 +30,15 @@ def main():
     with open(args.input_jsonl, "r", encoding="utf-8") as f:
         rows = [json.loads(line) for line in f if line.strip()]
 
-    if args.max_samples is not None:
-        rows = rows[: args.max_samples]
-
     outputs: List[Dict[str, Any]] = []
+    scanned_rows = 0
     for i, row in enumerate(rows):
+        scanned_rows += 1
         text = str(row.get(args.text_field, ""))
         masks = build_query_token_masks(text, tokenizer)
+        if args.require_search and not masks["search_actions"]:
+            continue
+
         response_len = len(masks["tokens"])
 
         # Mode semantics:
@@ -84,6 +87,15 @@ def main():
                 "reward_conservation_error": abs(score_sum - expected),
                 "warnings": warnings,
             }
+        )
+
+        if args.max_samples is not None and len(outputs) >= args.max_samples:
+            break
+
+    if args.require_search and args.max_samples is not None and len(outputs) < args.max_samples:
+        print(
+            f"[warning] Requested max_samples={args.max_samples} with --require_search, but only found {len(outputs)} valid rows out of {scanned_rows} scanned.",
+            flush=True,
         )
 
     os.makedirs(os.path.dirname(args.output_jsonl) or ".", exist_ok=True)
