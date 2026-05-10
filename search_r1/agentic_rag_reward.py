@@ -151,6 +151,13 @@ def build_token_level_scores(batch, tokenizer=None, reward_decomposition_mode: s
     if tokenizer is None:
         raise ValueError("tokenizer is required for build_token_level_scores")
 
+    allowed_modes = {"none", "coarse_action", "query_token_uniform"}
+    if reward_decomposition_mode not in allowed_modes:
+        raise ValueError(
+            f"Unsupported reward_decomposition_mode={reward_decomposition_mode!r}; "
+            f"expected one of {sorted(allowed_modes)}"
+        )
+
     responses = batch.batch["responses"]
     batch_size, response_len = responses.shape
     token_scores = torch.zeros((batch_size, response_len), dtype=torch.float32, device=responses.device)
