@@ -6,6 +6,8 @@ from typing import Any, Dict, List, Tuple
 
 
 SEARCH_PATTERN = re.compile(r"<search>(.*?)</search>", flags=re.DOTALL)
+ANSWER_PATTERN = re.compile(r"<answer>(.*?)</answer>", flags=re.DOTALL)
+FORMAT_TAG_PATTERN = re.compile(r"</?(search|answer|think|step|reasoning|context|conclusion)>")
 
 
 def extract_search_spans(text: str) -> List[Dict[str, Any]]:
@@ -82,6 +84,99 @@ def build_query_token_masks(text: str, tokenizer) -> Dict[str, Any]:
         "search_actions": search_actions,
         "action_mask": action_mask,
         "query_token_mask": query_token_mask,
+    }
+
+
+def extract_answer_spans(text: str) -> List[Dict[str, Any]]:
+    if not text:
+        return []
+    spans: List[Dict[str, Any]] = []
+    for match in ANSWER_PATTERN.finditer(text):
+        action_start, action_end = match.span(0)
+        answer_start, answer_end = match.span(1)
+        spans.append(
+            {
+                "action_start_char": action_start,
+                "action_end_char": action_end,
+                "answer_start_char": answer_start,
+                "answer_end_char": answer_end,
+                "answer_text": match.group(1),
+            }
+        )
+    return spans
+
+
+def extract_format_spans(text: str) -> List[Dict[str, Any]]:
+    if not text:
+        return []
+    return [
+        {"tag_text": m.group(0), "start_char": m.start(), "end_char": m.end()}
+        for m in FORMAT_TAG_PATTERN.finditer(text)
+    ]
+
+
+def _count_invalid_search_patterns(text: str, valid_search_count: int) -> int:
+    open_exact = len(re.findall(r"<search>", text))
+    close_exact = len(re.findall(r"</search>", text))
+    open_like = len(re.findall(r"<search\b[^>]*>", text))
+    invalid_open_like = max(open_like - open_exact, 0)
+    unmatched_open = max(open_exact - valid_search_count, 0)
+    unmatched_close = max(close_exact - valid_search_count, 0)
+    return int(invalid_open_like + unmatched_open + unmatched_close)
+
+
+def build_response_token_masks(text: str, tokenizer) -> Dict[str, Any]:
+    tokens, offsets = _tokenize_with_offsets(text, tokenizer)
+    n_tokens = len(offsets)
+    action_mask = [0] * n_tokens
+    search_query_mask = [0] * n_tokens
+    answer_content_mask = [0] * n_tokens
+    format_mask = [0] * n_tokens
+    warnings: List[str] = []
+
+    search_actions: List[Dict[str, Any]] = []
+    for span in extract_search_spans(text):
+        action_idx, query_idx = [], []
+        for i, (start, end) in enumerate(offsets):
+            if max(start, span["action_start_char"]) < min(end, span["action_end_char"]):
+                action_mask[i] = 1
+                action_idx.append(i)
+            if max(start, span["query_start_char"]) < min(end, span["query_end_char"]):
+                search_query_mask[i] = 1
+                query_idx.append(i)
+        search_actions.append({**span, "action_token_indices": action_idx, "query_token_indices": query_idx})
+
+    answer_actions: List[Dict[str, Any]] = []
+    for span in extract_answer_spans(text):
+        answer_idx = []
+        for i, (start, end) in enumerate(offsets):
+            if max(start, span["answer_start_char"]) < min(end, span["answer_end_char"]):
+                answer_content_mask[i] = 1
+                answer_idx.append(i)
+        answer_actions.append({**span, "answer_token_indices": answer_idx})
+
+    format_spans = extract_format_spans(text)
+    for span in format_spans:
+        for i, (start, end) in enumerate(offsets):
+            if max(start, span["start_char"]) < min(end, span["end_char"]):
+                format_mask[i] = 1
+
+    invalid_search_count = _count_invalid_search_patterns(text, len(search_actions))
+    if invalid_search_count > 0:
+        warnings.append(f"invalid_search_count={invalid_search_count}")
+
+    return {
+        "tokens": tokens,
+        "offsets": offsets,
+        "search_actions": search_actions,
+        "answer_actions": answer_actions,
+        "format_spans": format_spans,
+        "action_mask": action_mask,
+        "search_query_mask": search_query_mask,
+        "answer_content_mask": answer_content_mask,
+        "format_mask": format_mask,
+        "invalid_search_count": invalid_search_count,
+        "warnings": warnings,
     }
 
 
