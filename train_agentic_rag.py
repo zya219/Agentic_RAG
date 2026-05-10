@@ -36,10 +36,10 @@ def build_cmd(args: argparse.Namespace) -> list[str]:
         f"critic.ppo_micro_batch_size={args.critic_micro_batch_size}",
         f"actor_rollout_ref.rollout.tensor_model_parallel_size={args.tensor_model_parallel_size}",
         f"do_search={str(args.do_search).lower()}",
-        f"reward_decomposition_mode={args.reward_decomposition_mode}",
-        f"format_reward_value={args.format_reward_value}",
-        f"format_penalty_value={args.format_penalty_value}",
-        f"reward_debug={str(args.reward_debug).lower()}",
+        f"+reward_decomposition_mode={args.reward_decomposition_mode}",
+        f"+format_reward_value={args.format_reward_value}",
+        f"+format_penalty_value={args.format_penalty_value}",
+        f"+reward_debug={str(args.reward_debug).lower()}",
         # Adapter usage is integrated in ray_trainer via build_token_level_scores().
         # No separate switch is needed unless you modify trainer logic.
     ]
