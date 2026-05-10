@@ -95,3 +95,14 @@ python baseline_experiments.py \
   --retriever_url http://127.0.0.1:8000/retrieve \
   --max_samples 5
 ```
+
+## Thesis reporting utilities
+
+```bash
+python aggregate_baseline_results.py --help
+python check_experiment_outputs.py --help
+python -m pytest tests/test_agentic_rag_reward.py
+python tests/test_agentic_rag_reward.py
+```
+
+See also: `docs/final_test_commands.md` for final test baseline/evaluation command templates.
