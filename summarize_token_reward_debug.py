@@ -34,6 +34,15 @@ def main():
  'repeated_search_count':sum(r.get('repeated_search_count',0) for r in rows),
  'invalid_format_count':sum(r.get('invalid_format_count',0) for r in rows),
  'answer_missing_count':sum(r.get('answer_missing_count',0) for r in rows),
+
+ 'search_mismatch_count':sum(r.get('search_mismatch_count',0) for r in rows),
+ 'answer_mismatch_count':sum(r.get('answer_mismatch_count',0) for r in rows),
+ 'malformed_action_count':sum(r.get('malformed_action_count',0) for r in rows),
+ 'full_format_valid_count':sum(r.get('full_format_valid',0) for r in rows),
+ 'avg_search_mismatch_count':avg([r.get('search_mismatch_count',0) for r in rows]),
+ 'avg_answer_mismatch_count':avg([r.get('answer_mismatch_count',0) for r in rows]),
+ 'avg_malformed_action_count':avg([r.get('malformed_action_count',0) for r in rows]),
+ 'avg_full_format_valid':avg([r.get('full_format_valid',0) for r in rows]),
  'max_reward_conservation_error':max([abs(r.get('reward_sums',{}).get('conservation_error',0.0)) for r in rows], default=0.0),
  'warning_counts':dict(wc)}
  ensure_parent(a.output_markdown); ensure_parent(a.output_csv); ensure_parent(a.output_json)
