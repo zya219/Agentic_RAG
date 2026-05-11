@@ -143,6 +143,9 @@ def build_token_level_scores_with_debug(
     reward_decomposition_mode: str = "none",
     format_reward_value: float = 0.0,
     format_penalty_value: float = -1.0,
+    search_cost_value: float = 0.1,
+    repeat_search_penalty_value: float = 0.2,
+    answer_missing_penalty_value: float = -1.0,
 ):
     token_scores, debug_info = build_token_level_scores(
         batch=batch,
@@ -150,11 +153,14 @@ def build_token_level_scores_with_debug(
         reward_decomposition_mode=reward_decomposition_mode,
         format_reward_value=format_reward_value,
         format_penalty_value=format_penalty_value,
+        search_cost_value=search_cost_value,
+        repeat_search_penalty_value=repeat_search_penalty_value,
+        answer_missing_penalty_value=answer_missing_penalty_value,
         return_debug=True,
     )
     return token_scores, debug_info
 
-def build_token_level_scores(batch, tokenizer=None, reward_decomposition_mode: str = "none", format_reward_value: float = 0.0, format_penalty_value: float = -1.0, return_debug: bool = False):
+def build_token_level_scores(batch, tokenizer=None, reward_decomposition_mode: str = "none", format_reward_value: float = 0.0, format_penalty_value: float = -1.0, search_cost_value: float = 0.1, repeat_search_penalty_value: float = 0.2, answer_missing_penalty_value: float = -1.0, return_debug: bool = False):
     """Build PPO-compatible token-level scores from a rollout batch.
 
     Args:
@@ -170,7 +176,7 @@ def build_token_level_scores(batch, tokenizer=None, reward_decomposition_mode: s
     if tokenizer is None:
         raise ValueError("tokenizer is required for build_token_level_scores")
 
-    allowed_modes = {"none", "coarse_action", "query_token_uniform", "strict_query_token"}
+    allowed_modes = {"none", "coarse_action", "query_token_uniform", "strict_query_token", "strict_query_token_cost"}
     if reward_decomposition_mode not in allowed_modes:
         raise ValueError(
             f"Unsupported reward_decomposition_mode={reward_decomposition_mode!r}; "
@@ -215,7 +221,7 @@ def build_token_level_scores(batch, tokenizer=None, reward_decomposition_mode: s
             search_mask=search_mask,
         )
         warnings = []
-        if reward_decomposition_mode in {"coarse_action", "query_token_uniform", "strict_query_token"} and valid_response_len > 0:
+        if reward_decomposition_mode in {"coarse_action", "query_token_uniform", "strict_query_token", "strict_query_token_cost"} and valid_response_len > 0:
             masks = build_response_token_masks(response_text, tokenizer)
             token_scores_i = token_scores_i.clone()
             # clear default search allocation
@@ -243,11 +249,30 @@ def build_token_level_scores(batch, tokenizer=None, reward_decomposition_mode: s
             if reward_decomposition_mode == "strict_query_token" and not search_selected:
                 strict_search_reward = 0.0
                 warnings.append("no_query_tokens_for_strict_search_reward")
+            search_scores = [0.0] * valid_response_len
+            if reward_decomposition_mode == "strict_query_token_cost":
+                # cost-aware post-hoc query-token-level reward decomposition:
+                # still uses strict post-hoc parsing masks (not online POAD / not action-space changes).
+                valid_search_actions = [
+                    a for a in masks.get("search_actions", [])
+                    if a.get("query_token_indices") and (a.get("query_text") or "").strip()
+                ]
+                for si, action in enumerate(valid_search_actions):
+                    qidx = [idx for idx in action["query_token_indices"] if idx < valid_response_len]
+                    if not qidx:
+                        continue
+                    pos_scores, _ = allocate_reward_to_tokens(valid_response_len, qidx, float(search_reward))
+                    cost_scores, _ = allocate_reward_to_tokens(valid_response_len, qidx, -float(search_cost_value))
+                    rep_scores = [0.0] * valid_response_len
+                    if si >= 1:
+                        rep_scores, _ = allocate_reward_to_tokens(valid_response_len, qidx, -float(repeat_search_penalty_value))
+                    search_scores = [x + y + z + w for x, y, z, w in zip(search_scores, pos_scores, cost_scores, rep_scores)]
+                token_scores_i[:valid_response_len] += torch.tensor(search_scores, dtype=token_scores_i.dtype, device=token_scores_i.device)
+            else:
+                search_scores, _ = allocate_reward_to_tokens(valid_response_len, search_selected, strict_search_reward)
+                token_scores_i[:valid_response_len] += torch.tensor(search_scores, dtype=token_scores_i.dtype, device=token_scores_i.device)
 
-            search_scores, _ = allocate_reward_to_tokens(valid_response_len, search_selected, strict_search_reward)
-            token_scores_i[:valid_response_len] += torch.tensor(search_scores, dtype=token_scores_i.dtype, device=token_scores_i.device)
-
-            if reward_decomposition_mode == "strict_query_token":
+            if reward_decomposition_mode in {"strict_query_token", "strict_query_token_cost"}:
                 # remove default answer assignment and re-allocate by answer mask
                 answer_idx_default = torch.nonzero((answer_mask > 0) if answer_mask is not None else torch.zeros(valid_response_len), as_tuple=False).flatten()
                 if answer_idx_default.numel() > 0:
@@ -255,24 +280,38 @@ def build_token_level_scores(batch, tokenizer=None, reward_decomposition_mode: s
                 elif valid_response_len > 0:
                     token_scores_i[valid_response_len - 1] -= answer_reward
                 ans_selected = [idx for idx, v in enumerate(masks["answer_content_mask"]) if v > 0 and idx < valid_response_len]
-                ans_scores, _ = allocate_reward_to_tokens(valid_response_len, ans_selected, answer_reward)
+                has_valid_answer = any((a.get("answer_text") or "").strip() for a in masks.get("answer_actions", []))
+                ans_scores, _ = allocate_reward_to_tokens(valid_response_len, ans_selected, answer_reward if has_valid_answer else 0.0)
                 token_scores_i[:valid_response_len] += torch.tensor(ans_scores, dtype=token_scores_i.dtype, device=token_scores_i.device)
 
                 format_selected = [idx for idx, v in enumerate(masks["format_mask"]) if v > 0 and idx < valid_response_len]
-                format_reward = format_reward_value if masks["invalid_search_count"] == 0 else format_penalty_value
-                if not format_selected and masks["invalid_search_count"] > 0 and valid_response_len > 0:
+                invalid_format = (masks["invalid_search_count"] > 0) or (masks.get("invalid_answer_count", 0) > 0) or (masks.get("empty_search_count", 0) > 0)
+                format_reward = format_reward_value if not invalid_format else format_penalty_value
+                if not format_selected and invalid_format and valid_response_len > 0:
                     format_selected = [valid_response_len - 1]
                 fmt_scores, _ = allocate_reward_to_tokens(valid_response_len, format_selected, format_reward)
                 token_scores_i[:valid_response_len] += torch.tensor(fmt_scores, dtype=token_scores_i.dtype, device=token_scores_i.device)
+                if reward_decomposition_mode == "strict_query_token_cost" and not has_valid_answer:
+                    answer_missing_selected = format_selected or ([valid_response_len - 1] if valid_response_len > 0 else [])
+                    miss_scores, _ = allocate_reward_to_tokens(valid_response_len, answer_missing_selected, float(answer_missing_penalty_value))
+                    token_scores_i[:valid_response_len] += torch.tensor(miss_scores, dtype=token_scores_i.dtype, device=token_scores_i.device)
             debug_rows.append({
                 "query_token_count": int(sum(masks["search_query_mask"][:valid_response_len])),
                 "answer_content_token_count": int(sum(masks["answer_content_mask"][:valid_response_len])),
                 "format_token_count": int(sum(masks["format_mask"][:valid_response_len])),
                 "invalid_search_count": int(masks["invalid_search_count"]),
+                "invalid_format_count": int((masks["invalid_search_count"] > 0) or (masks.get("invalid_answer_count", 0) > 0) or (masks.get("empty_search_count", 0) > 0)),
+                "answer_missing_count": int(not any((a.get("answer_text") or "").strip() for a in masks.get("answer_actions", []))),
+                "search_count": int(sum(1 for a in masks.get("search_actions", []) if (a.get("query_text") or "").strip())),
+                "repeated_search_count": int(max(0, sum(1 for a in masks.get("search_actions", []) if (a.get("query_text") or "").strip()) - 1)),
                 "search_reward_sum": float(sum(search_scores)),
-                "answer_reward_sum": float(answer_reward),
-                "format_reward_sum": float((format_reward_value if masks["invalid_search_count"] == 0 else format_penalty_value) if reward_decomposition_mode=="strict_query_token" else 0.0),
+                "answer_reward_sum": float(sum(ans_scores) if 'ans_scores' in locals() else answer_reward),
+                "format_reward_sum": float(sum(fmt_scores) if 'fmt_scores' in locals() else 0.0),
                 "total_token_score_sum": float(token_scores_i[:valid_response_len].sum().item()),
+                "search_query_mask": masks["search_query_mask"][:valid_response_len],
+                "answer_content_mask": masks["answer_content_mask"][:valid_response_len],
+                "format_mask": masks["format_mask"][:valid_response_len],
+                "action_mask": masks["action_mask"][:valid_response_len],
                 "warnings": list(masks.get("warnings", [])) + warnings,
             })
 

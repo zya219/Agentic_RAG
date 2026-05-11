@@ -162,8 +162,15 @@ def build_response_token_masks(text: str, tokenizer) -> Dict[str, Any]:
                 format_mask[i] = 1
 
     invalid_search_count = _count_invalid_search_patterns(text, len(search_actions))
+    open_answer = len(re.findall(r"<answer>", text))
+    close_answer = len(re.findall(r"</answer>", text))
+    invalid_answer_count = int(max(open_answer - len(answer_actions), 0) + max(close_answer - len(answer_actions), 0))
+    empty_search_count = int(sum(1 for a in search_actions if not (a.get("query_text") or "").strip()))
+    empty_answer_count = int(sum(1 for a in answer_actions if not (a.get("answer_text") or "").strip()))
     if invalid_search_count > 0:
         warnings.append(f"invalid_search_count={invalid_search_count}")
+    if invalid_answer_count > 0:
+        warnings.append(f"invalid_answer_count={invalid_answer_count}")
 
     return {
         "tokens": tokens,
@@ -176,6 +183,9 @@ def build_response_token_masks(text: str, tokenizer) -> Dict[str, Any]:
         "answer_content_mask": answer_content_mask,
         "format_mask": format_mask,
         "invalid_search_count": invalid_search_count,
+        "invalid_answer_count": invalid_answer_count,
+        "empty_search_count": empty_search_count,
+        "empty_answer_count": empty_answer_count,
         "warnings": warnings,
     }
 
