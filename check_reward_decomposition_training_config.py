@@ -6,7 +6,7 @@ from __future__ import annotations
 import subprocess
 import sys
 
-MODES = ["none", "coarse_action", "query_token_uniform", "strict_query_token"]
+MODES = ["none", "coarse_action", "query_token_uniform", "strict_query_token", "strict_query_token_cost"]
 
 
 def run_mode(mode: str) -> tuple[bool, str]:

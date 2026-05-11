@@ -39,6 +39,9 @@ def build_cmd(args: argparse.Namespace) -> list[str]:
         f"+reward_decomposition_mode={args.reward_decomposition_mode}",
         f"+format_reward_value={args.format_reward_value}",
         f"+format_penalty_value={args.format_penalty_value}",
+        f"+search_cost_value={args.search_cost_value}",
+        f"+repeat_search_penalty_value={args.repeat_search_penalty_value}",
+        f"+answer_missing_penalty_value={args.answer_missing_penalty_value}",
         f"+reward_debug={str(args.reward_debug).lower()}",
         # Adapter usage is integrated in ray_trainer via build_token_level_scores().
         # No separate switch is needed unless you modify trainer logic.
@@ -71,9 +74,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--critic_micro_batch_size", type=int, default=4)
     parser.add_argument("--tensor_model_parallel_size", type=int, default=1)
     parser.add_argument("--do_search", action="store_true", default=True, help="Keep Agentic RAG retrieval loop on.")
-    parser.add_argument("--reward_decomposition_mode", choices=["none", "coarse_action", "query_token_uniform", "strict_query_token"], default="none")
+    parser.add_argument("--reward_decomposition_mode", choices=["none", "coarse_action", "query_token_uniform", "strict_query_token", "strict_query_token_cost"], default="none")
     parser.add_argument("--format_reward_value", type=float, default=0.0)
     parser.add_argument("--format_penalty_value", type=float, default=-1.0)
+    parser.add_argument("--search_cost_value", type=float, default=0.1)
+    parser.add_argument("--repeat_search_penalty_value", type=float, default=0.2)
+    parser.add_argument("--answer_missing_penalty_value", type=float, default=-1.0)
     parser.add_argument("--reward_debug", action="store_true", default=False)
 
     parser.add_argument("--dry_run", action="store_true", help="Print command only.")

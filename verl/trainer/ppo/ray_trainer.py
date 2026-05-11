@@ -792,6 +792,9 @@ class RayPPOTrainer(object):
                         reward_mode = self.config.get("reward_decomposition_mode", "none")
                         format_reward_value = self.config.get("format_reward_value", 0.0)
                         format_penalty_value = self.config.get("format_penalty_value", -1.0)
+                        search_cost_value = self.config.get("search_cost_value", 0.1)
+                        repeat_search_penalty_value = self.config.get("repeat_search_penalty_value", 0.2)
+                        answer_missing_penalty_value = self.config.get("answer_missing_penalty_value", -1.0)
                         reward_debug_enabled = self.config.get("reward_debug", False)
                         try:
                             if reward_debug_enabled:
@@ -801,6 +804,9 @@ class RayPPOTrainer(object):
                                     reward_decomposition_mode=reward_mode,
                                     format_reward_value=format_reward_value,
                                     format_penalty_value=format_penalty_value,
+                                    search_cost_value=search_cost_value,
+                                    repeat_search_penalty_value=repeat_search_penalty_value,
+                                    answer_missing_penalty_value=answer_missing_penalty_value,
                                 )
                             else:
                                 reward_tensor = build_token_level_scores(
@@ -809,6 +815,9 @@ class RayPPOTrainer(object):
                                     reward_decomposition_mode=reward_mode,
                                     format_reward_value=format_reward_value,
                                     format_penalty_value=format_penalty_value,
+                                    search_cost_value=search_cost_value,
+                                    repeat_search_penalty_value=repeat_search_penalty_value,
+                                    answer_missing_penalty_value=answer_missing_penalty_value,
                                 )
                             reward_tensor = reward_tensor.to(batch.batch['responses'].device)
                         except Exception as e:
@@ -829,7 +838,7 @@ class RayPPOTrainer(object):
                                 if values:
                                     metrics[f'reward_decomposition/{field}_mean'] = float(np.mean(values))
 
-                            for mode in ["none", "coarse_action", "query_token_uniform", "strict_query_token"]:
+                            for mode in ["none", "coarse_action", "query_token_uniform", "strict_query_token", "strict_query_token_cost"]:
                                 metrics[f'reward_decomposition/mode_{mode}'] = 1.0 if reward_mode == mode else 0.0
 
                         # compute rewards. apply_kl_penalty if available
