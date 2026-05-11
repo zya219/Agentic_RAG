@@ -291,7 +291,16 @@ def build_token_level_scores(batch, tokenizer=None, reward_decomposition_mode: s
                 token_scores_i[:valid_response_len] += torch.tensor(ans_scores, dtype=token_scores_i.dtype, device=token_scores_i.device)
 
                 format_selected = [idx for idx, v in enumerate(masks["format_mask"]) if v > 0 and idx < valid_response_len]
-                invalid_format = (masks["invalid_search_count"] > 0) or (masks.get("invalid_answer_count", 0) > 0) or (masks.get("empty_search_count", 0) > 0)
+                invalid_format = (
+                    (masks["invalid_search_count"] > 0)
+                    or (masks.get("invalid_answer_count", 0) > 0)
+                    or (masks.get("empty_search_count", 0) > 0)
+                    or (masks.get("empty_answer_count", 0) > 0)
+                    or (masks.get("search_mismatch_count", 0) > 0)
+                    or (masks.get("answer_mismatch_count", 0) > 0)
+                    or (masks.get("malformed_action_count", 0) > 0)
+                    or (masks.get("answer_missing_count", 0) > 0)
+                )
                 format_reward = format_reward_value if not invalid_format else format_penalty_value
                 if not format_selected and invalid_format and valid_response_len > 0:
                     format_selected = [valid_response_len - 1]
@@ -325,7 +334,16 @@ def build_token_level_scores(batch, tokenizer=None, reward_decomposition_mode: s
                 "answer_content_token_count": int(sum(masks["answer_content_mask"][:valid_response_len])),
                 "format_token_count": int(sum(masks["format_mask"][:valid_response_len])),
                 "invalid_search_count": int(masks["invalid_search_count"]),
-                "invalid_format_count": int((masks["invalid_search_count"] > 0) or (masks.get("invalid_answer_count", 0) > 0) or (masks.get("empty_search_count", 0) > 0)),
+                "invalid_format_count": int(
+                    (masks["invalid_search_count"] > 0)
+                    or (masks.get("invalid_answer_count", 0) > 0)
+                    or (masks.get("empty_search_count", 0) > 0)
+                    or (masks.get("empty_answer_count", 0) > 0)
+                    or (masks.get("search_mismatch_count", 0) > 0)
+                    or (masks.get("answer_mismatch_count", 0) > 0)
+                    or (masks.get("malformed_action_count", 0) > 0)
+                    or (masks.get("answer_missing_count", 0) > 0)
+                ),
                 "answer_missing_count": int(not any((a.get("answer_text") or "").strip() for a in masks.get("answer_actions", []))),
                 "search_open_count": int(masks.get("search_open_count", 0)),
                 "search_close_count": int(masks.get("search_close_count", 0)),
