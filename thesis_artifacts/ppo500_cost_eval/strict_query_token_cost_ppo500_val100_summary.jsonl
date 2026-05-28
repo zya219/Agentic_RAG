@@ -1,0 +1,3 @@
+{"data_source": "hotpotqa", "count": 51, "em": 0.0392, "avg_search_count": 5.4706, "oversearch_count": 0, "undersearch_count": 0}
+{"data_source": "nq", "count": 49, "em": 0.0, "avg_search_count": 5.4286, "oversearch_count": 0, "undersearch_count": 0}
+{"data_source": "ALL", "count": 100, "em": 0.02, "avg_search_count": 5.45, "oversearch_count": 0, "undersearch_count": 0}

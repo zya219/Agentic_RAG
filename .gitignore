@@ -29,3 +29,21 @@ data/
 datasets/
 *.index
 *.faiss
+# Thesis large files and caches
+*.safetensors
+*.bin
+*.pt
+*.pth
+*.index
+*.faiss
+*.parquet
+.cache/
+__pycache__/
+.ipynb_checkpoints/
+
+# Model/checkpoint directories
+**/actor/
+**/critic/
+**/huggingface/
+experiment_archive/ppo500_checkpoints/
+thesis_artifacts/ppo500_checkpoints/

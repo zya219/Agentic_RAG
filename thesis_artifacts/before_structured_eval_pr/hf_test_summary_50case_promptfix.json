@@ -1,0 +1,67 @@
+{
+  "overall": {
+    "total_sample_count": 50,
+    "decision_true_count": 21,
+    "decision_false_count": 29,
+    "actual_search_count": 17,
+    "no_search_count": 33,
+    "valid_search_count": 17,
+    "no_search_action_count": 33,
+    "invalid_search_format_count": 0,
+    "invalid_search_format_rate": 0.0,
+    "search_action_status_counts": {
+      "valid_search": 17,
+      "invalid_search_format": 0,
+      "no_search": 33
+    },
+    "search_mismatch_count": 4,
+    "search_mismatch_rate": 0.08,
+    "search_overuse_count": 0,
+    "avg_search_count": 0.36,
+    "answer_missing_count": 0
+  },
+  "by_decision_type": {
+    "direct": {
+      "total_sample_count": 29,
+      "decision_true_count": 0,
+      "decision_false_count": 29,
+      "actual_search_count": 0,
+      "no_search_count": 29,
+      "valid_search_count": 0,
+      "no_search_action_count": 29,
+      "invalid_search_format_count": 0,
+      "invalid_search_format_rate": 0.0,
+      "search_action_status_counts": {
+        "valid_search": 0,
+        "invalid_search_format": 0,
+        "no_search": 29
+      },
+      "search_mismatch_count": 0,
+      "search_mismatch_rate": 0.0,
+      "search_overuse_count": 0,
+      "avg_search_count": 0.0,
+      "answer_missing_count": 0
+    },
+    "retrieve": {
+      "total_sample_count": 21,
+      "decision_true_count": 21,
+      "decision_false_count": 0,
+      "actual_search_count": 17,
+      "no_search_count": 4,
+      "valid_search_count": 17,
+      "no_search_action_count": 4,
+      "invalid_search_format_count": 0,
+      "invalid_search_format_rate": 0.0,
+      "search_action_status_counts": {
+        "valid_search": 17,
+        "invalid_search_format": 0,
+        "no_search": 4
+      },
+      "search_mismatch_count": 4,
+      "search_mismatch_rate": 0.19047619047619047,
+      "search_overuse_count": 0,
+      "avg_search_count": 0.8571428571428571,
+      "answer_missing_count": 0
+    }
+  }
+}

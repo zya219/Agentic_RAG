@@ -1,0 +1,100 @@
+{
+  "total": 500,
+  "answer_em": 0.072,
+  "answer_f1": 0.1476484216445793,
+  "avg_final_reward": 0.1436484216445793,
+  "avg_answer_reward": 0.1476484216445793,
+  "avg_search_decision_reward": 0.0,
+  "avg_format_reward": 0.0,
+  "avg_efficiency_penalty": 0.0,
+  "answer_missing_count": 2,
+  "search_mismatch_count": 0,
+  "invalid_search_format_count": 0,
+  "avg_search_count": 0.0,
+  "reward_component_means": {
+    "answer_em": 0.072,
+    "answer_f1": 0.1476484216445793,
+    "answer_reward": 0.1476484216445793,
+    "search_decision_reward": 0.0,
+    "format_reward": 0.0,
+    "efficiency_penalty": 0.0,
+    "answer_missing_penalty": -0.004,
+    "final_reward": 0.1436484216445793
+  },
+  "grouped_by_data_source": {
+    "hotpotqa": {
+      "total": 268,
+      "answer_em": 0.0708955223880597,
+      "answer_f1": 0.1463012127053911,
+      "avg_final_reward": 0.14256986942180896,
+      "avg_answer_reward": 0.1463012127053911,
+      "avg_search_decision_reward": 0.0,
+      "avg_format_reward": 0.0,
+      "avg_efficiency_penalty": 0.0,
+      "answer_missing_count": 1,
+      "search_mismatch_count": 0,
+      "invalid_search_format_count": 0,
+      "avg_search_count": 0.0,
+      "reward_component_means": {
+        "answer_em": 0.0708955223880597,
+        "answer_f1": 0.1463012127053911,
+        "answer_reward": 0.1463012127053911,
+        "search_decision_reward": 0.0,
+        "format_reward": 0.0,
+        "efficiency_penalty": 0.0,
+        "answer_missing_penalty": -0.0037313432835820895,
+        "final_reward": 0.14256986942180896
+      }
+    },
+    "nq": {
+      "total": 232,
+      "answer_em": 0.07327586206896551,
+      "answer_f1": 0.14920468024674485,
+      "avg_final_reward": 0.14489433541915864,
+      "avg_answer_reward": 0.14920468024674485,
+      "avg_search_decision_reward": 0.0,
+      "avg_format_reward": 0.0,
+      "avg_efficiency_penalty": 0.0,
+      "answer_missing_count": 1,
+      "search_mismatch_count": 0,
+      "invalid_search_format_count": 0,
+      "avg_search_count": 0.0,
+      "reward_component_means": {
+        "answer_em": 0.07327586206896551,
+        "answer_f1": 0.14920468024674485,
+        "answer_reward": 0.14920468024674485,
+        "search_decision_reward": 0.0,
+        "format_reward": 0.0,
+        "efficiency_penalty": 0.0,
+        "answer_missing_penalty": -0.004310344827586207,
+        "final_reward": 0.14489433541915864
+      }
+    }
+  },
+  "grouped_by_split_name": {
+    "calibration": {
+      "total": 500,
+      "answer_em": 0.072,
+      "answer_f1": 0.1476484216445793,
+      "avg_final_reward": 0.1436484216445793,
+      "avg_answer_reward": 0.1476484216445793,
+      "avg_search_decision_reward": 0.0,
+      "avg_format_reward": 0.0,
+      "avg_efficiency_penalty": 0.0,
+      "answer_missing_count": 2,
+      "search_mismatch_count": 0,
+      "invalid_search_format_count": 0,
+      "avg_search_count": 0.0,
+      "reward_component_means": {
+        "answer_em": 0.072,
+        "answer_f1": 0.1476484216445793,
+        "answer_reward": 0.1476484216445793,
+        "search_decision_reward": 0.0,
+        "format_reward": 0.0,
+        "efficiency_penalty": 0.0,
+        "answer_missing_penalty": -0.004,
+        "final_reward": 0.1436484216445793
+      }
+    }
+  }
+}

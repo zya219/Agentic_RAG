@@ -1,0 +1,40 @@
+{
+  "overall": {
+    "total_sample_count": 4,
+    "decision_true_count": 2,
+    "decision_false_count": 2,
+    "actual_search_count": 2,
+    "no_search_count": 2,
+    "search_mismatch_count": 0,
+    "search_mismatch_rate": 0.0,
+    "search_overuse_count": 0,
+    "avg_search_count": 0.5,
+    "answer_missing_count": 0
+  },
+  "by_decision_type": {
+    "retrieve": {
+      "total_sample_count": 2,
+      "decision_true_count": 2,
+      "decision_false_count": 0,
+      "actual_search_count": 2,
+      "no_search_count": 0,
+      "search_mismatch_count": 0,
+      "search_mismatch_rate": 0.0,
+      "search_overuse_count": 0,
+      "avg_search_count": 1.0,
+      "answer_missing_count": 0
+    },
+    "direct": {
+      "total_sample_count": 2,
+      "decision_true_count": 0,
+      "decision_false_count": 2,
+      "actual_search_count": 0,
+      "no_search_count": 2,
+      "search_mismatch_count": 0,
+      "search_mismatch_rate": 0.0,
+      "search_overuse_count": 0,
+      "avg_search_count": 0.0,
+      "answer_missing_count": 0
+    }
+  }
+}

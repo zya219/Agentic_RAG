@@ -1,0 +1,24 @@
+# Token Reward Debug Summary
+
+- total_cases: 20
+- cases_with_search: 20
+- cases_with_answer: 20
+- avg_query_token_count: 10.3
+- avg_answer_content_token_count: 43.7
+- avg_format_token_count: 61.1
+- avg_invalid_search_count: 0.0
+- avg_total_reward_sum: 1.0800000000000003
+- total_token_reward_sum: 21.600000000000005
+- positive_token_reward_sum: 22.000000000000004
+- negative_token_reward_sum: -0.4
+- nonzero_reward_token_count: 1080
+- query_token_reward_sum: 1.6000000000000003
+- answer_token_reward_sum: 20.000000000000004
+- format_token_reward_sum: 0.8703361797141997
+- search_count: 24
+- repeated_search_count: 4
+- invalid_format_count: 0
+- answer_missing_count: 0
+- max_reward_conservation_error: 0.0
+
+## warning_counts

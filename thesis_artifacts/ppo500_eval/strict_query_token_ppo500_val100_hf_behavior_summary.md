@@ -1,0 +1,11 @@
+# strict_query_token PPO-500 val100 HF behavior summary
+
+| Metric | Value |
+|---|---:|
+| samples | 100 |
+| em | 0.0 |
+| f1 | 0.011404 |
+| avg_search | 0.99 |
+| search_mismatch | 7 |
+| invalid_format | 85 |
+| answer_missing | 78 |

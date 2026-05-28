@@ -1,0 +1,24 @@
+Launch command:
+ /root/miniconda3/envs/arag/bin/python \
+  -m \
+  verl.trainer.main_ppo_format \
+  actor_rollout_ref.model.path=Qwen/Qwen2.5-3B-Instruct \
+  critic.model.path=Qwen/Qwen2.5-3B-Instruct \
+  critic.model.tokenizer_path=Qwen/Qwen2.5-3B-Instruct \
+  data.tokenizer=Qwen/Qwen2.5-3B-Instruct \
+  data.train_files=../data/HiPRAG-Dataset/train.parquet \
+  data.val_files=../data/HiPRAG-Dataset/train.parquet \
+  retriever.url=http://127.0.0.1:8000/retrieve \
+  trainer.default_local_dir=runs/poad_style_dryrun_qwen25_3b \
+  trainer.project_name=agentic_rag_thesis \
+  trainer.experiment_name=poad_style_token_reward_dryrun \
+  trainer.n_gpus_per_node=1 \
+  trainer.nnodes=1 \
+  trainer.total_epochs=1 \
+  data.train_batch_size=2 \
+  data.val_batch_size=2 \
+  actor_rollout_ref.actor.ppo_mini_batch_size=1 \
+  actor_rollout_ref.actor.ppo_micro_batch_size=1 \
+  critic.ppo_micro_batch_size=1 \
+  actor_rollout_ref.rollout.tensor_model_parallel_size=1 \
+  do_search=true

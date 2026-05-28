@@ -1,0 +1,60 @@
+{
+  "summary_version": "v1",
+  "metrics": [
+    {
+      "mode": "none",
+      "total_rows": 20,
+      "rows_with_search": 20,
+      "rows_without_search": 0,
+      "total_search_actions": 24,
+      "avg_search_action_count": 1.2,
+      "avg_query_text_count": 1.2,
+      "avg_action_token_count_per_action": 14.416666666666666,
+      "avg_query_token_count_per_action": 8.583333333333334,
+      "avg_token_score_sum": 0.0,
+      "avg_expected_reward_sum": 0.0,
+      "max_reward_conservation_error": 0.0,
+      "avg_reward_conservation_error": 0.0,
+      "warning_count": 0,
+      "fallback_to_last_token_count": 0,
+      "fallback_to_coarse_action_count": 0
+    },
+    {
+      "mode": "coarse_action",
+      "total_rows": 20,
+      "rows_with_search": 20,
+      "rows_without_search": 0,
+      "total_search_actions": 24,
+      "avg_search_action_count": 1.2,
+      "avg_query_text_count": 1.2,
+      "avg_action_token_count_per_action": 14.416666666666666,
+      "avg_query_token_count_per_action": 8.583333333333334,
+      "avg_token_score_sum": 1.0,
+      "avg_expected_reward_sum": 1.0,
+      "max_reward_conservation_error": 6.661338147750939e-16,
+      "avg_reward_conservation_error": 1.942890293094024e-16,
+      "warning_count": 0,
+      "fallback_to_last_token_count": 0,
+      "fallback_to_coarse_action_count": 0
+    },
+    {
+      "mode": "query_token_uniform",
+      "total_rows": 20,
+      "rows_with_search": 20,
+      "rows_without_search": 0,
+      "total_search_actions": 24,
+      "avg_search_action_count": 1.2,
+      "avg_query_text_count": 1.2,
+      "avg_action_token_count_per_action": 14.416666666666666,
+      "avg_query_token_count_per_action": 8.583333333333334,
+      "avg_token_score_sum": 1.0,
+      "avg_expected_reward_sum": 1.0,
+      "max_reward_conservation_error": 6.661338147750939e-16,
+      "avg_reward_conservation_error": 1.8318679906315082e-16,
+      "warning_count": 0,
+      "fallback_to_last_token_count": 0,
+      "fallback_to_coarse_action_count": 0
+    }
+  ],
+  "notes": []
+}

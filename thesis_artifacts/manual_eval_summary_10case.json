@@ -1,0 +1,21 @@
+{
+  "total": 10,
+  "manual_correct": 9,
+  "manual_wrong": 1,
+  "manual_accuracy": 0.9,
+  "needs_retrieval_gold_true": 6,
+  "needs_retrieval_gold_false": 4,
+  "expected_search_true": 5,
+  "actual_search_true": 4,
+  "routing_gold_accuracy": 0.7,
+  "actual_search_gold_accuracy": 0.8,
+  "search_mismatch_count": 1,
+  "answer_missing_count": 1,
+  "error_type_counts": {
+    "correct": 6,
+    "outdated_or_realtime": 1,
+    "search_mismatch_but_correct": 1,
+    "false_premise_detected": 1,
+    "missing_answer": 1
+  }
+}

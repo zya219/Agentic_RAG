@@ -1,0 +1,50 @@
+{"id": 1, "category": "math_direct", "question": "What is the result of (125 + 37) * 4?"}
+{"id": 2, "category": "math_direct", "question": "What is 18 squared minus 7 multiplied by 9?"}
+{"id": 3, "category": "math_direct", "question": "Solve for x: 3x + 5 = 20."}
+{"id": 4, "category": "math_direct", "question": "What is the average of 12, 15, and 21?"}
+{"id": 5, "category": "math_direct", "question": "If a train travels 60 kilometers in 1.5 hours, what is its average speed in kilometers per hour?"}
+{"id": 6, "category": "common_knowledge_direct", "question": "What is photosynthesis?"}
+{"id": 7, "category": "common_knowledge_direct", "question": "What is the boiling point of water at standard atmospheric pressure in Celsius?"}
+{"id": 8, "category": "common_knowledge_direct", "question": "What is the Pythagorean theorem?"}
+{"id": 9, "category": "common_knowledge_direct", "question": "What is the difference between DNA and RNA?"}
+{"id": 10, "category": "common_knowledge_direct", "question": "What is evaporation?"}
+{"id": 11, "category": "static_fact_singlehop", "question": "Who wrote Pride and Prejudice?"}
+{"id": 12, "category": "static_fact_singlehop", "question": "Who discovered penicillin?"}
+{"id": 13, "category": "static_fact_singlehop", "question": "Which city hosted the 1992 Winter Olympics?"}
+{"id": 14, "category": "static_fact_singlehop", "question": "Who wrote the sci-fi novel The Left Hand of Darkness?"}
+{"id": 15, "category": "static_fact_singlehop", "question": "When was the Eiffel Tower completed?"}
+{"id": 16, "category": "static_fact_singlehop", "question": "Who painted The Starry Night?"}
+{"id": 17, "category": "static_fact_singlehop", "question": "Which country gifted the Statue of Liberty to the United States?"}
+{"id": 18, "category": "static_fact_singlehop", "question": "Who proposed the theory of general relativity?"}
+{"id": 19, "category": "multi_hop_retrieval", "question": "The director of the 1994 film Pulp Fiction was born in which city?"}
+{"id": 20, "category": "multi_hop_retrieval", "question": "The author of The Old Man and the Sea was born in which U.S. state?"}
+{"id": 21, "category": "multi_hop_retrieval", "question": "The scientist who developed the polio vaccine was born in which city?"}
+{"id": 22, "category": "multi_hop_retrieval", "question": "The actor who played Jack Dawson in Titanic was born in which city?"}
+{"id": 23, "category": "multi_hop_retrieval", "question": "The composer of The Four Seasons was born in which Italian city?"}
+{"id": 24, "category": "multi_hop_retrieval", "question": "The company that created the iPhone was founded in which year?"}
+{"id": 25, "category": "multi_hop_retrieval", "question": "The first person to walk on the Moon was born in which U.S. state?"}
+{"id": 26, "category": "multi_hop_retrieval", "question": "The author of 1984 died in which year?"}
+{"id": 27, "category": "current_or_realtime", "question": "Who is the current CEO of Microsoft as of 2024?"}
+{"id": 28, "category": "current_or_realtime", "question": "What is the current stock price of Apple Inc.?"}
+{"id": 29, "category": "current_or_realtime", "question": "Who is the current president of France?"}
+{"id": 30, "category": "current_or_realtime", "question": "What is the latest version of Python?"}
+{"id": 31, "category": "current_or_realtime", "question": "What is the current exchange rate from USD to JPY?"}
+{"id": 32, "category": "false_premise", "question": "When was the United States constitutional amendment passed that banned the consumption of broccoli?"}
+{"id": 33, "category": "false_premise", "question": "Who was the first person to land on the Sun?"}
+{"id": 34, "category": "false_premise", "question": "Which country won the 2023 FIFA World Cup for men?"}
+{"id": 35, "category": "false_premise", "question": "What year did Albert Einstein become emperor of Germany?"}
+{"id": 36, "category": "false_premise", "question": "Which ocean is located on the Moon?"}
+{"id": 37, "category": "domain_expert", "question": "What is the mechanism of action for the drug Imatinib?"}
+{"id": 38, "category": "domain_expert", "question": "What is the main idea of the transformer architecture in deep learning?"}
+{"id": 39, "category": "domain_expert", "question": "What is the role of FAISS in retrieval-augmented generation?"}
+{"id": 40, "category": "domain_expert", "question": "What is policy optimization in reinforcement learning?"}
+{"id": 41, "category": "domain_expert", "question": "What is the difference between dense retrieval and sparse retrieval?"}
+{"id": 42, "category": "domain_expert", "question": "What is credit assignment in reinforcement learning?"}
+{"id": 43, "category": "date_calculation", "question": "How many days are there between the release date of the movie Inception and the movie Interstellar?"}
+{"id": 44, "category": "date_calculation", "question": "How many years passed between the publication of 1984 and the publication of Animal Farm?"}
+{"id": 45, "category": "date_calculation", "question": "How many years after the founding of Apple was the first iPhone released?"}
+{"id": 46, "category": "date_calculation", "question": "How many years passed between the completion of the Eiffel Tower and the first Moon landing?"}
+{"id": 47, "category": "routing_boundary", "question": "Should a question about the current weather in Tokyo be answered from a static Wikipedia corpus?"}
+{"id": 48, "category": "routing_boundary", "question": "Is the capital of France likely to require retrieval from an external corpus?"}
+{"id": 49, "category": "routing_boundary", "question": "If a question asks for the birthplace of a lesser-known scientist, should retrieval be used?"}
+{"id": 50, "category": "routing_boundary", "question": "If a question combines a movie release date and a date difference calculation, should retrieval be used?"}

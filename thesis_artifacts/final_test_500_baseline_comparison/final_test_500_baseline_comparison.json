@@ -1,0 +1,82 @@
+{
+  "title": "Final-Test-500 Baseline Comparison",
+  "methods": [
+    {
+      "method": "direct",
+      "total": 500,
+      "answer_em": 0.098,
+      "answer_f1": 0.1695222856558999,
+      "avg_search_count": 0.0,
+      "search_mismatch_count": 0,
+      "invalid_search_format_count": 0,
+      "answer_missing_count": 4,
+      "avg_final_reward": 0.16152228565589988,
+      "avg_answer_reward": 0.1695222856558999,
+      "avg_search_decision_reward": 0.0,
+      "avg_format_reward": 0.0,
+      "avg_efficiency_penalty": 0.0
+    },
+    {
+      "method": "always_retrieve",
+      "total": 500,
+      "answer_em": 0.03,
+      "answer_f1": 0.18736230680725927,
+      "avg_search_count": 1.0,
+      "search_mismatch_count": 0,
+      "invalid_search_format_count": 0,
+      "answer_missing_count": 4,
+      "avg_final_reward": 0.37936230680725824,
+      "avg_answer_reward": 0.18736230680725927,
+      "avg_search_decision_reward": 0.20000000000000176,
+      "avg_format_reward": 0.0,
+      "avg_efficiency_penalty": 0.0
+    },
+    {
+      "method": "rule_based",
+      "total": 500,
+      "answer_em": 0.096,
+      "answer_f1": 0.17587717225013277,
+      "avg_search_count": 0.264,
+      "search_mismatch_count": 6,
+      "invalid_search_format_count": 0,
+      "answer_missing_count": 4,
+      "avg_final_reward": 0.19327717225013286,
+      "avg_answer_reward": 0.17587717225013277,
+      "avg_search_decision_reward": 0.030399999999999955,
+      "avg_format_reward": 0.0,
+      "avg_efficiency_penalty": -0.005
+    },
+    {
+      "method": "prompt_self_routing",
+      "total": 500,
+      "answer_em": 0.022,
+      "answer_f1": 0.15971455403526463,
+      "avg_search_count": 1.204,
+      "search_mismatch_count": 470,
+      "invalid_search_format_count": 0,
+      "answer_missing_count": 6,
+      "avg_final_reward": -0.05348544596473533,
+      "avg_answer_reward": 0.15971455403526463,
+      "avg_search_decision_reward": -0.18800000000000158,
+      "avg_format_reward": 0.0,
+      "avg_efficiency_penalty": -0.013199999999999977
+    }
+  ],
+  "metrics": [
+    "total",
+    "answer_em",
+    "answer_f1",
+    "avg_search_count",
+    "search_mismatch_count",
+    "invalid_search_format_count",
+    "answer_missing_count",
+    "avg_final_reward",
+    "avg_answer_reward",
+    "avg_search_decision_reward",
+    "avg_format_reward",
+    "avg_efficiency_penalty"
+  ],
+  "notes": [
+    "avg_final_reward may not be directly comparable across baselines if search_decision_reward gives fixed reward to forced-search methods. Answer EM/F1 and avg_search_count should be interpreted together."
+  ]
+}

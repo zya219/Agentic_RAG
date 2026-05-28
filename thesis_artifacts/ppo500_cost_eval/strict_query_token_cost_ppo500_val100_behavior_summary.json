@@ -1,0 +1,9 @@
+{
+  "samples": 100,
+  "strict_em": 0.0,
+  "f1": 0.003488,
+  "avg_search": 5.45,
+  "search_mismatch": 97,
+  "invalid_format": 97,
+  "answer_missing": 0
+}
