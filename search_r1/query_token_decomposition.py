@@ -162,11 +162,27 @@ def build_response_token_masks(text: str, tokenizer) -> Dict[str, Any]:
                 format_mask[i] = 1
 
     invalid_search_count = _count_invalid_search_patterns(text, len(search_actions))
-    open_answer = len(re.findall(r"<answer>", text))
-    close_answer = len(re.findall(r"</answer>", text))
+    search_open_count = len(re.findall(r"<search>", text))
+    search_close_count = len(re.findall(r"</search>", text))
+    search_mismatch_count = int(search_open_count != search_close_count)
+    answer_open_count = len(re.findall(r"<answer>", text))
+    answer_close_count = len(re.findall(r"</answer>", text))
+    answer_mismatch_count = int(answer_open_count != answer_close_count)
+    open_answer = answer_open_count
+    close_answer = answer_close_count
     invalid_answer_count = int(max(open_answer - len(answer_actions), 0) + max(close_answer - len(answer_actions), 0))
     empty_search_count = int(sum(1 for a in search_actions if not (a.get("query_text") or "").strip()))
     empty_answer_count = int(sum(1 for a in answer_actions if not (a.get("answer_text") or "").strip()))
+    answer_missing_count = int(not any((a.get("answer_text") or "").strip() for a in answer_actions))
+    malformed_action_count = int(search_mismatch_count + empty_search_count + invalid_search_count)
+    full_format_valid = int(
+        search_mismatch_count == 0
+        and answer_mismatch_count == 0
+        and invalid_search_count == 0
+        and empty_search_count == 0
+        and answer_missing_count == 0
+        and any((a.get("answer_text") or "").strip() for a in answer_actions)
+    )
     if invalid_search_count > 0:
         warnings.append(f"invalid_search_count={invalid_search_count}")
     if invalid_answer_count > 0:
@@ -186,6 +202,15 @@ def build_response_token_masks(text: str, tokenizer) -> Dict[str, Any]:
         "invalid_answer_count": invalid_answer_count,
         "empty_search_count": empty_search_count,
         "empty_answer_count": empty_answer_count,
+        "search_open_count": search_open_count,
+        "search_close_count": search_close_count,
+        "answer_open_count": answer_open_count,
+        "answer_close_count": answer_close_count,
+        "search_mismatch_count": search_mismatch_count,
+        "answer_mismatch_count": answer_mismatch_count,
+        "malformed_action_count": malformed_action_count,
+        "full_format_valid": full_format_valid,
+        "answer_missing_count": answer_missing_count,
         "warnings": warnings,
     }
 

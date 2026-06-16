@@ -795,6 +795,9 @@ class RayPPOTrainer(object):
                         search_cost_value = self.config.get("search_cost_value", 0.1)
                         repeat_search_penalty_value = self.config.get("repeat_search_penalty_value", 0.2)
                         answer_missing_penalty_value = self.config.get("answer_missing_penalty_value", -1.0)
+                        full_format_reward_value = self.config.get("full_format_reward_value", 0.5)
+                        search_mismatch_penalty_value = self.config.get("search_mismatch_penalty_value", -2.0)
+                        malformed_action_penalty_value = self.config.get("malformed_action_penalty_value", -1.0)
                         reward_debug_enabled = self.config.get("reward_debug", False)
                         try:
                             if reward_debug_enabled:
@@ -807,6 +810,9 @@ class RayPPOTrainer(object):
                                     search_cost_value=search_cost_value,
                                     repeat_search_penalty_value=repeat_search_penalty_value,
                                     answer_missing_penalty_value=answer_missing_penalty_value,
+                                    full_format_reward_value=full_format_reward_value,
+                                    search_mismatch_penalty_value=search_mismatch_penalty_value,
+                                    malformed_action_penalty_value=malformed_action_penalty_value,
                                 )
                             else:
                                 reward_tensor = build_token_level_scores(
@@ -818,6 +824,9 @@ class RayPPOTrainer(object):
                                     search_cost_value=search_cost_value,
                                     repeat_search_penalty_value=repeat_search_penalty_value,
                                     answer_missing_penalty_value=answer_missing_penalty_value,
+                                    full_format_reward_value=full_format_reward_value,
+                                    search_mismatch_penalty_value=search_mismatch_penalty_value,
+                                    malformed_action_penalty_value=malformed_action_penalty_value,
                                 )
                             reward_tensor = reward_tensor.to(batch.batch['responses'].device)
                         except Exception as e:
@@ -832,6 +841,7 @@ class RayPPOTrainer(object):
                             reward_fields = [
                                 'query_token_count', 'answer_content_token_count', 'format_token_count', 'invalid_search_count',
                                 'search_reward_sum', 'answer_reward_sum', 'format_reward_sum', 'total_token_score_sum',
+                                'search_mismatch_count', 'answer_mismatch_count', 'malformed_action_count', 'full_format_valid',
                             ]
                             for field in reward_fields:
                                 values = [float(row.get(field, 0.0)) for row in reward_debug_info if isinstance(row, dict)]

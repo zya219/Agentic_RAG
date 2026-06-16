@@ -6,7 +6,7 @@ from __future__ import annotations
 import subprocess
 import sys
 
-MODES = ["none", "coarse_action", "query_token_uniform", "strict_query_token", "strict_query_token_cost"]
+MODES = ["none", "coarse_action", "query_token_uniform", "strict_query_token", "strict_query_token_cost", "strict_query_token_cost_format"]
 
 
 def run_mode(mode: str) -> tuple[bool, str]:
@@ -27,6 +27,9 @@ def run_mode(mode: str) -> tuple[bool, str]:
         f"reward_decomposition_mode={mode}",
         "format_reward_value=",
         "format_penalty_value=",
+        "full_format_reward_value=",
+        "search_mismatch_penalty_value=",
+        "malformed_action_penalty_value=",
         "reward_debug=",
     ]
     ok = proc.returncode == 0 and all(token in out for token in required)
